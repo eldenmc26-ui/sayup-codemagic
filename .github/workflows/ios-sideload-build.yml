@@ -23,7 +23,7 @@ jobs:
         run: chmod -R +x node_modules/.bin || true
 
       - name: Expo install
-        run: npx expo install --legacy-peer-deps
+        run: npx expo install -- --legacy-peer-deps
 
       - name: Expo prebuild
         run: npx expo prebuild --platform ios --clean
