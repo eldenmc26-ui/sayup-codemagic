@@ -11,51 +11,40 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ✅ Node 20
+      # ✅ Node stabile (evita tutti gli EBADENGINE)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # 🔥 FORZA XCODE 16
-      - name: Select Xcode 16
-        run: sudo xcode-select -s /Applications/Xcode_16.app
-
-      - name: Show Xcode version
-        run: xcodebuild -version
-
-      # ✅ install deps
+      # ✅ Install base deps con fix peer deps
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      # ✅ fix permessi
-      - name: Fix node_modules permissions
+      # 🔥 evita errore "expo permission denied"
+      - name: Fix permissions
         run: chmod -R +x node_modules/.bin || true
 
-      # 🔥 fix Expo + RN
-      - name: Fix Expo dependencies
-        run: |
-          npx --yes expo@55 install react-native -- --legacy-peer-deps
-          npx --yes expo@55 install -- --legacy-peer-deps
+      # ✅ NON usare expo@latest (rompe tutto)
+      - name: Expo install safe
+        run: npx expo install --legacy-peer-deps
 
+      # 🔥 Prebuild pulito
+      - name: Expo Prebuild
+        run: npx expo prebuild --platform ios --clean
+
+      # ✅ CocoaPods stabile
       - name: Setup CocoaPods
         run: |
           sudo gem install cocoapods -v 1.15.2
           pod repo update
-
-      - name: Clean project
-        run: |
-          rm -rf ios
-          rm -rf node_modules/.cache
-
-      - name: Expo Prebuild
-        run: npx --yes expo@55 prebuild --platform ios
 
       - name: Install Pods
         run: |
           cd ios
           pod install --repo-update
 
+      # 🧱 Build iOS unsigned
       - name: Build Xcode (Unsigned)
         run: |
           xcodebuild -workspace ios/*.xcworkspace \
@@ -66,12 +55,14 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
 
+      # 📦 IPA packaging
       - name: Package IPA
         run: |
           mkdir Payload
           cp -r build/Build/Products/Release-iphoneos/*.app Payload/
           zip -r Talksy-Sideload.ipa Payload
 
+      # 📤 Upload artifact
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
