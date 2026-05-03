@@ -1,0 +1,401 @@
+// src/services/chatService.ts
+import { Firestore, Database, Collections, RTDBPaths, Auth, FirestoreFieldValue } from './firebase';
+import type { TalksyUser } from './authService';
+import CryptoJS from 'crypto-js';
+
+export interface Message {
+  id:        string;
+  senderId:  string;
+  content:   string;
+  type:      'text' | 'image';
+  timestamp: number;
+  read:      boolean;
+  encrypted?: boolean;
+}
+
+export interface Chat {
+  id:           string;
+  participants: string[];
+  lastMessage:  string;
+  lastTs:       number;
+  unread:       Record<string, number>;
+  isGroup?:     boolean;
+  groupName?:   string;
+}
+
+const E2E_KEY_PREFIX = 'talksy-e2e-v1';
+
+function buildChatKey(chat: Chat): string {
+  const participants = [...chat.participants].sort().join('|');
+  return CryptoJS.SHA256(`${E2E_KEY_PREFIX}:${chat.id}:${participants}`).toString();
+}
+
+function encryptMessageContent(plainText: string, key: string): string {
+  return CryptoJS.AES.encrypt(plainText, key).toString();
+}
+
+function decryptMessageContent(cipherText: string, key: string): string {
+  const bytes = CryptoJS.AES.decrypt(cipherText, key);
+  return bytes.toString(CryptoJS.enc.Utf8);
+}
+
+async function getChatById(chatId: string): Promise<Chat> {
+  const chatDoc = await Firestore.collection(Collections.CHATS).doc(chatId).get();
+  const chat = chatDoc.data() as Chat | undefined;
+  if (!chat) {
+    throw new Error('Chat non trovata');
+  }
+  return chat;
+}
+
+export async function sendFriendRequest(otherUid: string): Promise<void> {
+  const myUid = Auth.currentUser!.uid;
+  if (myUid === otherUid) {
+    throw new Error('Non puoi aggiungere te stesso');
+  }
+
+  const [mySnap, otherSnap] = await Promise.all([
+    Firestore.collection(Collections.USERS).doc(myUid).get(),
+    Firestore.collection(Collections.USERS).doc(otherUid).get(),
+  ]);
+
+  if (!mySnap.exists || !otherSnap.exists) {
+    throw new Error('Utente non trovato');
+  }
+
+  const myUser = mySnap.data() as TalksyUser;
+  if (myUser.friends?.includes(otherUid)) {
+    throw new Error('Siete gia amici');
+  }
+  if (myUser.outgoingFriendRequests?.includes(otherUid)) {
+    throw new Error('Richiesta gia inviata');
+  }
+  if (myUser.incomingFriendRequests?.includes(otherUid)) {
+    throw new Error('Hai gia una richiesta da questo utente');
+  }
+
+  const batch = Firestore.batch();
+  batch.update(Firestore.collection(Collections.USERS).doc(myUid), {
+    outgoingFriendRequests: FirestoreFieldValue.arrayUnion(otherUid),
+  });
+  batch.update(Firestore.collection(Collections.USERS).doc(otherUid), {
+    incomingFriendRequests: FirestoreFieldValue.arrayUnion(myUid),
+  });
+  await batch.commit();
+
+  // Salva notifica per il destinatario
+  await Firestore.collection('notifications').add({
+    title: 'Nuova richiesta di amicizia',
+    body: `${myUser.displayName} (${myUser.nickname}) vuole essere tuo amico!`,
+    type: 'friend',
+    targetUid: otherUid,
+    fromUid: myUid,
+    read: false,
+    createdAt: Date.now(),
+  });
+}
+
+export async function acceptFriendRequest(otherUid: string): Promise<void> {
+  const myUid = Auth.currentUser!.uid;
+  const batch = Firestore.batch();
+
+  batch.update(Firestore.collection(Collections.USERS).doc(myUid), {
+    incomingFriendRequests: FirestoreFieldValue.arrayRemove(otherUid),
+    friends: FirestoreFieldValue.arrayUnion(otherUid),
+  });
+  batch.update(Firestore.collection(Collections.USERS).doc(otherUid), {
+    outgoingFriendRequests: FirestoreFieldValue.arrayRemove(myUid),
+    friends: FirestoreFieldValue.arrayUnion(myUid),
+  });
+
+  await batch.commit();
+
+  // Notifica l'altro utente che la richiesta è stata accettata
+  const myDoc = await Firestore.collection(Collections.USERS).doc(myUid).get();
+  const myData = myDoc.data() as TalksyUser;
+  await Firestore.collection('notifications').add({
+    title: 'Richiesta accettata!',
+    body: `${myData.displayName} ha accettato la tua richiesta di amicizia.`,
+    type: 'friend',
+    targetUid: otherUid,
+    fromUid: myUid,
+    read: false,
+    createdAt: Date.now(),
+  });
+}
+
+export async function declineFriendRequest(otherUid: string): Promise<void> {
+  const myUid = Auth.currentUser!.uid;
+  const batch = Firestore.batch();
+
+  batch.update(Firestore.collection(Collections.USERS).doc(myUid), {
+    incomingFriendRequests: FirestoreFieldValue.arrayRemove(otherUid),
+  });
+  batch.update(Firestore.collection(Collections.USERS).doc(otherUid), {
+    outgoingFriendRequests: FirestoreFieldValue.arrayRemove(myUid),
+  });
+
+  await batch.commit();
+}
+
+export function subscribeFriends(
+  callback: (friends: TalksyUser[]) => void,
+  onError?: () => void,
+): () => void {
+  const myUid = Auth.currentUser!.uid;
+
+  return Firestore.collection(Collections.USERS).doc(myUid).onSnapshot(
+    async (snap: any) => {
+      const data = snap.data() as TalksyUser | undefined;
+      const friendIds = data?.friends ?? [];
+      if (friendIds.length === 0) {
+        callback([]);
+        return;
+      }
+
+      const docs = await Promise.all(
+        friendIds.map((uid) => Firestore.collection(Collections.USERS).doc(uid).get()),
+      );
+      callback(docs.filter((doc) => doc.exists).map((doc) => doc.data() as TalksyUser));
+    },
+    () => {
+      onError?.();
+    },
+  );
+}
+
+export function subscribeIncomingFriendRequests(
+  callback: (users: TalksyUser[]) => void,
+  onError?: () => void,
+): () => void {
+  const myUid = Auth.currentUser!.uid;
+
+  return Firestore.collection(Collections.USERS).doc(myUid).onSnapshot(
+    async (snap: any) => {
+      const data = snap.data() as TalksyUser | undefined;
+      const requestIds = data?.incomingFriendRequests ?? [];
+      if (requestIds.length === 0) {
+        callback([]);
+        return;
+      }
+
+      const docs = await Promise.all(
+        requestIds.map((uid) => Firestore.collection(Collections.USERS).doc(uid).get()),
+      );
+      callback(docs.filter((doc) => doc.exists).map((doc) => doc.data() as TalksyUser));
+    },
+    () => {
+      onError?.();
+    },
+  );
+}
+
+export async function ensureChatParticipants(chatId: string): Promise<void> {
+  const chatDoc = await Firestore.collection(Collections.CHATS).doc(chatId).get();
+  const chat = chatDoc.data() as Chat | undefined;
+  if (!chat?.participants?.length) return;
+
+  const participantsObj: Record<string, boolean> = {};
+  chat.participants.forEach((uid) => { participantsObj[uid] = true; });
+
+  await Database.ref(`chatParticipants/${chatId}`).set(participantsObj);
+}
+
+// Crea o recupera una chat 1:1 tra due utenti
+export async function getOrCreateChat(otherUid: string): Promise<string> {
+  const myUid = Auth.currentUser!.uid;
+  const ids   = [myUid, otherUid].sort();
+  const chatId = ids.join('_');
+
+  const chatDoc = await Firestore.collection(Collections.CHATS).doc(chatId).get();
+  if (!chatDoc.exists) {
+    await Firestore.collection(Collections.CHATS).doc(chatId).set({
+      id:           chatId,
+      participants: ids,
+      lastMessage:  '',
+      lastTs:       Date.now(),
+      unread:       { [myUid]: 0, [otherUid]: 0 },
+    } as Chat);
+  }
+
+  await ensureChatParticipants(chatId);
+  return chatId;
+}
+
+// Invia un messaggio
+export async function sendMessage(chatId: string, content: string): Promise<void> {
+  const myUid = Auth.currentUser!.uid;
+  const chat = await getChatById(chatId);
+  const e2eKey = buildChatKey(chat);
+
+  try {
+    await ensureChatParticipants(chatId);
+  } catch {
+    // Non bloccare l'invio se la mappa partecipanti e' gia presente lato server.
+  }
+
+  const encryptedContent = encryptMessageContent(content, e2eKey);
+  const msgRef = Database.ref(RTDBPaths.messages(chatId)).push();
+
+  const msg: Message = {
+    id:        msgRef.key!,
+    senderId:  myUid,
+    content: encryptedContent,
+    type:      'text',
+    timestamp: Date.now(),
+    read:      false,
+    encrypted: true,
+  };
+
+  await msgRef.set(msg);
+
+  // Aggiorna lastMessage su Firestore
+  await Firestore.collection(Collections.CHATS).doc(chatId).update({
+    lastMessage: 'Messaggio cifrato',
+    lastTs:      msg.timestamp,
+  });
+
+  const myUserDoc = await Firestore.collection(Collections.USERS).doc(myUid).get();
+  const myUser = myUserDoc.data() as TalksyUser | undefined;
+
+  const otherParticipants = chat.participants.filter((uid) => uid !== myUid);
+  for (const targetUid of otherParticipants) {
+    await Firestore.collection('notifications').add({
+      title: chat.isGroup ? `Nuovo messaggio in ${chat.groupName}` : `Messaggio da ${myUser?.displayName ?? 'Talksy'}`,
+      body: 'Hai ricevuto un nuovo messaggio cifrato',
+      type: 'message',
+      targetUid,
+      fromUid: myUid,
+      chatId,
+      read: false,
+      createdAt: Date.now(),
+    });
+  }
+}
+
+// Sottoscrivi ai messaggi in tempo reale
+export function subscribeToMessages(
+  chatId:   string,
+  callback: (messages: Message[]) => void,
+): () => void {
+  const ref = Database.ref(RTDBPaths.messages(chatId));
+
+  let chatCache: Chat | null = null;
+  let chatKeyCache: string | null = null;
+
+  const loadKey = async (): Promise<string | null> => {
+    if (chatKeyCache) return chatKeyCache;
+    if (!chatCache) {
+      try {
+        chatCache = await getChatById(chatId);
+      } catch {
+        return null;
+      }
+    }
+    chatKeyCache = buildChatKey(chatCache);
+    return chatKeyCache;
+  };
+
+  const handler = ref.on('value', async (snap: any) => {
+    const raw  = snap.val() ?? {};
+    const msgs = Object.values(raw) as Message[];
+    const maybeKey = await loadKey();
+
+    const normalized: Message[] = msgs.map((msg: Message) => {
+      if (!msg.encrypted || !maybeKey) return msg;
+      try {
+        const plain = decryptMessageContent(msg.content, maybeKey);
+        return {
+          ...msg,
+          content: plain || '[Messaggio cifrato non leggibile]',
+        };
+      } catch {
+        return {
+          ...msg,
+          content: '[Messaggio cifrato non leggibile]',
+        };
+      }
+    });
+
+    normalized.sort((a: Message, b: Message) => a.timestamp - b.timestamp);
+    callback(normalized);
+  });
+
+  return () => ref.off('value', handler);
+}
+
+// Sottoscrivi alla lista chat dell'utente
+export function subscribeChats(
+  callback: (chats: Chat[]) => void,
+  onError?: () => void,
+): () => void {
+  const myUid = Auth.currentUser!.uid;
+  const unsub = Firestore
+    .collection(Collections.CHATS)
+    .where('participants', 'array-contains', myUid)
+    .onSnapshot(
+      (snap: any) => {
+        const chats = snap.docs
+          .map((d: any) => d.data() as Chat)
+          .sort((a: Chat, b: Chat) => (b.lastTs ?? 0) - (a.lastTs ?? 0));
+        callback(chats);
+      },
+      () => {
+        onError?.();
+      },
+    );
+  return unsub;
+}
+
+// Imposta il typing indicator
+export function setTyping(chatId: string, isTyping: boolean): void {
+  const myUid = Auth.currentUser!.uid;
+  Database.ref(`${RTDBPaths.typing(chatId)}/${myUid}`).set(isTyping ? true : null);
+}
+
+// Aggiorna la presenza online
+export function setPresence(online: boolean): void {
+  const myUid = Auth.currentUser!.uid;
+  const ref   = Database.ref(RTDBPaths.presence(myUid));
+  ref.set({ online, lastSeen: Date.now() });
+  if (online) ref.onDisconnect().set({ online: false, lastSeen: Date.now() });
+}
+
+// Crea una chat di gruppo
+export async function createGroupChat(groupName: string, participantUids: string[]): Promise<string> {
+  const myUid = Auth.currentUser!.uid;
+  const allParticipants = Array.from(new Set([myUid, ...participantUids])).sort();
+
+  const ref = Firestore.collection(Collections.CHATS).doc();
+  const unread: Record<string, number> = {};
+  allParticipants.forEach((uid) => { unread[uid] = 0; });
+
+  const chat: Chat = {
+    id: ref.id,
+    participants: allParticipants,
+    lastMessage: '',
+    lastTs: Date.now(),
+    unread,
+    isGroup: true,
+    groupName: groupName.trim(),
+  };
+
+  await ref.set(chat);
+
+  const participantsObj: Record<string, boolean> = {};
+  allParticipants.forEach((uid) => { participantsObj[uid] = true; });
+  await Database.ref(`chatParticipants/${ref.id}`).set(participantsObj);
+
+  return ref.id;
+}
+
+// Cerca utenti per nickname
+export async function searchUsers(query: string): Promise<TalksyUser[]> {
+  const snap = await Firestore
+    .collection(Collections.USERS)
+    .where('nickname', '>=', query.toLowerCase())
+    .where('nickname', '<=', query.toLowerCase() + '\uf8ff')
+    .limit(20)
+    .get();
+  return snap.docs.map((d: any) => d.data() as TalksyUser);
+}

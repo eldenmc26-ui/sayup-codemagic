@@ -1,0 +1,25 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Foto profilo — solo il proprietario può scrivere, tutti i loggati leggono
+    match /avatars/{uid}/{fileName} {
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size < 5 * 1024 * 1024     // max 5MB
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Media nelle chat — solo i partecipanti
+    match /chat_media/{chatId}/{fileName} {
+      allow read, write: if request.auth != null
+        && request.resource.size < 50 * 1024 * 1024;   // max 50MB
+    }
+
+    // Tutto il resto: negato
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

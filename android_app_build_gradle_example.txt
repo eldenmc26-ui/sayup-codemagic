@@ -1,0 +1,13 @@
+// android/app/build.gradle
+// NOTA: questo file va modificato manualmente dopo aver copiato il progetto
+// Aggiungi questa riga alla fine del file:
+
+apply plugin: 'com.google.gms.google-services'
+
+// E assicurati che minSdkVersion sia almeno 23
+android {
+    defaultConfig {
+        minSdkVersion rootProject.ext.minSdkVersion
+        // ...
+    }
+}
