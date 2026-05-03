@@ -1,6 +1,6 @@
 workflows:
-  ios-ipa:
-    name: Talksy iOS IPA Stable Build
+  ios-clean-build:
+    name: Talksy iOS Clean Rebuild IPA
     max_build_duration: 120
     instance_type: mac_mini_m2
 
@@ -9,37 +9,40 @@ workflows:
       xcode: latest
       cocoapods: default
 
-    cache:
-      cache_paths:
-        - node_modules
-        - ~/.npm
-        - ios/Pods
-
     scripts:
 
-      # 📦 INSTALL FORZATO (risolve gifted-chat + RN conflicts)
-      - name: Install dependencies
+      # 💣 NUCLEAR CLEAN (TUTTO RESETTATO OGNI VOLTA)
+      - name: Clean everything
+        script: |
+          echo "🧹 Removing node_modules, ios, pods, caches..."
+          rm -rf node_modules
+          rm -rf ios
+          rm -rf package-lock.json
+          npm cache clean --force
+
+      # 📦 Fresh install (forza tutto senza conflitti)
+      - name: Install dependencies fresh
         script: |
           npm install --legacy-peer-deps --force
 
-      # 🔧 FIX PERMESSI BINARI (risolve expo permission denied)
+      # 🔧 Fix permissions (expo CLI fix)
       - name: Fix permissions
         script: |
           chmod -R +x node_modules/.bin || true
 
-      # 📱 Expo prebuild (SEMPRE npx)
+      # 📱 Expo prebuild from scratch
       - name: Expo prebuild clean
         script: |
           npx expo prebuild --platform ios --clean
 
-      # 🍫 CocoaPods install
-      - name: Install CocoaPods
+      # 🍫 CocoaPods fresh install
+      - name: Install CocoaPods fresh
         script: |
           cd ios
           pod install --repo-update
 
       # 🧱 Build iOS unsigned
-      - name: Build iOS
+      - name: Build iOS app
         script: |
           xcodebuild -workspace ios/*.xcworkspace \
             -scheme talksy \
@@ -52,7 +55,7 @@ workflows:
       # 📦 Create IPA
       - name: Package IPA
         script: |
-          mkdir Payload
+          mkdir -p Payload
           cp -r build/Build/Products/Release-iphoneos/*.app Payload/
           zip -r Talksy.ipa Payload
 
