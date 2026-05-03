@@ -1,0 +1,49 @@
+name: iOS Sideload Build
+on:
+  workflow_dispatch: # Permette di avviarlo manualmente dalla scheda Actions su GitHub
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Expo Prebuild
+        run: |
+          chmod +x node_modules/.bin/expo
+          npx expo prebuild --platform ios --no-install
+
+      - name: Install CocoaPods
+        run: cd ios && pod install
+
+      - name: Build Xcode (Unsigned)
+        run: |
+          xcodebuild -workspace ios/*.xcworkspace \
+            -scheme talksy \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Package IPA
+        run: |
+          mkdir Payload
+          cp -r build/Build/Products/Release-iphoneos/*.app Payload/
+          zip -r Talksy-Sideload.ipa Payload
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Talksy-iOS-IPA
+          path: Talksy-Sideload.ipa
