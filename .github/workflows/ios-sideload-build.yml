@@ -19,6 +19,9 @@ jobs:
         run: npm install --legacy-peer-deps
 
       - name: Expo Prebuild
+        env:
+          # Disabilita Flipper per evitare problemi con get_folly_config
+          EXPO_NO_FLIPPER: 1
         run: |
           chmod +x node_modules/.bin/expo
           npx expo prebuild --platform ios --no-install
