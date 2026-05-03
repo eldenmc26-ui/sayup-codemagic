@@ -27,6 +27,9 @@ jobs:
           npx expo prebuild --platform ios --no-install
 
       - name: Install CocoaPods
+        env:
+          # Disabilita Flipper per evitare problemi con get_folly_config durante pod install
+          EXPO_NO_FLIPPER: 1
         run: cd ios && pod install
 
       - name: Build Xcode (Unsigned)
