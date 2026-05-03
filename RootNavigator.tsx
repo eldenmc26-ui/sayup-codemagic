@@ -239,15 +239,25 @@ export default function RootNavigator() {
     };
 
     // Gestisce la UI quando sei TU a far partire la chiamata (deve essere fuori da initSendbird)
-    outgoingSubRef.current = DeviceEventEmitter.addListener('ON_OUTGOING_CALL', (call: any) => {
-      if (!call) return;
-      sbCallRef.current = call;
-      setActiveCall({
-        id: call.callId,
-        data: { status: 'dialing', callerId: Auth.currentUser?.uid || '', participants: [], type: 'voice', createdAt: Date.now(), chatId: '', groupName: 'Sto chiamando...' }
+    if (!outgoingSubRef.current) {
+      outgoingSubRef.current = DeviceEventEmitter.addListener('ON_OUTGOING_CALL', (call: any) => {
+        if (!call) return;
+        sbCallRef.current = call;
+        setActiveCall({
+          id: call.callId,
+          data: { 
+            status: 'dialing', 
+            callerId: Auth.currentUser?.uid || '', 
+            participants: [], 
+            type: 'voice', 
+            createdAt: Date.now(), 
+            chatId: '', 
+            groupName: 'Sto chiamando...' 
+          }
+        });
+        if (typeof call.setListener === 'function') setupCallListeners(call);
       });
-      if (typeof call.setListener === 'function') setupCallListeners(call);
-    });
+    }
 
     // Ascolta i cambiamenti dello stato di autenticazione Firebase
     const unsubscribe = Auth.onAuthStateChanged(async (firebaseUser: any) => {

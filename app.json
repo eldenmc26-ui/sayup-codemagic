@@ -16,7 +16,12 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.xxmauro.talksy"
+      "bundleIdentifier": "com.xxmauro.talksy",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Talksy ha bisogno del microfono per le chiamate vocali.",
+        "NSCameraUsageDescription": "Talksy ha bisogno della fotocamera per scattare foto e videochiamate.",
+        "NSPhotoLibraryUsageDescription": "Talksy ha bisogno di accedere alla tua galleria per inviare immagini."
+      }
     },
     "android": {
       "package": "com.xxmauro.talksy",
