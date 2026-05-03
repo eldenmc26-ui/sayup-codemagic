@@ -1,6 +1,6 @@
 workflows:
-  ios-sideload:
-    name: Talksy IPA Fixed Permissions
+  ios-ipa:
+    name: Talksy iOS IPA Stable Build
     max_build_duration: 120
     instance_type: mac_mini_m2
 
@@ -9,31 +9,37 @@ workflows:
       xcode: latest
       cocoapods: default
 
+    cache:
+      cache_paths:
+        - node_modules
+        - ~/.npm
+        - ios/Pods
+
     scripts:
 
-      # 📦 install deps (FORCE per evitare conflict gifted-chat)
+      # 📦 INSTALL FORZATO (risolve gifted-chat + RN conflicts)
       - name: Install dependencies
         script: |
           npm install --legacy-peer-deps --force
 
-      # 🔧 FIX CRITICO: permessi binari npm (RISOLVE ERRORE 126)
-      - name: Fix npm permissions
+      # 🔧 FIX PERMESSI BINARI (risolve expo permission denied)
+      - name: Fix permissions
         script: |
           chmod -R +x node_modules/.bin || true
 
-      # 📱 Expo prebuild (IMPORTANTE: SOLO npx, NON binario locale)
-      - name: Expo prebuild
+      # 📱 Expo prebuild (SEMPRE npx)
+      - name: Expo prebuild clean
         script: |
           npx expo prebuild --platform ios --clean
 
-      # 🍫 CocoaPods
+      # 🍫 CocoaPods install
       - name: Install CocoaPods
         script: |
           cd ios
           pod install --repo-update
 
-      # 🧱 Build iOS
-      - name: Build iOS app
+      # 🧱 Build iOS unsigned
+      - name: Build iOS
         script: |
           xcodebuild -workspace ios/*.xcworkspace \
             -scheme talksy \
@@ -43,8 +49,8 @@ workflows:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
 
-      # 📦 IPA
-      - name: Create IPA
+      # 📦 Create IPA
+      - name: Package IPA
         script: |
           mkdir Payload
           cp -r build/Build/Products/Release-iphoneos/*.app Payload/
