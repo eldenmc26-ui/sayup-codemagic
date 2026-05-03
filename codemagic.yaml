@@ -1,0 +1,68 @@
+workflows:
+  ios-sideload:
+    name: Talksy iOS IPA (Sideload)
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+
+    environment:
+      node: 20
+      xcode: latest
+      cocoapods: default
+
+    cache:
+      cache_paths:
+        - node_modules
+        - ~/.npm
+        - ios/Pods
+
+    scripts:
+
+      # 📦 Install dependencies (IMPORTANTE: legacy peer deps)
+      - name: Install npm dependencies
+        script: |
+          npm install --legacy-peer-deps
+
+      # 🔧 Fix Expo CLI issues (evita errori binari / permission)
+      - name: Prepare Expo
+        script: |
+          npm install -g expo-cli || true
+
+      # 📱 Expo prebuild (GENERA ios folder)
+      - name: Expo prebuild
+        script: |
+          npx expo prebuild --platform ios --clean
+
+      # 🍫 CocoaPods install
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios
+          pod install --repo-update
+
+      # 🧱 Build iOS unsigned
+      - name: Build iOS app
+        script: |
+          xcodebuild -workspace ios/*.xcworkspace \
+            -scheme talksy \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      # 📦 Create IPA
+      - name: Create IPA
+        script: |
+          mkdir Payload
+          cp -r build/Build/Products/Release-iphoneos/*.app Payload/
+          zip -r Talksy.ipa Payload
+
+    artifacts:
+      - Talksy.ipa
+
+    publishing:
+      email:
+        recipients:
+          - dev@talksy.app
+        notify:
+          success: true
+          failure: true
