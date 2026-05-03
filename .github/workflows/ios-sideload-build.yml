@@ -19,11 +19,15 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      # 🔥 FIX: allinea automaticamente Expo + React Native
+      # ✅ FIX PERMESSI GLOBALI (IMPORTANTE)
+      - name: Fix node_modules permissions
+        run: chmod -R +x node_modules/.bin || true
+
+      # 🔥 USA EXPO DA NPM, NON QUELLO LOCALE
       - name: Fix Expo dependencies
         run: |
-          npx --yes expo install react-native
-          npx --yes expo install
+          npx --yes expo@latest install react-native
+          npx --yes expo@latest install
 
       - name: Setup CocoaPods
         run: |
@@ -36,7 +40,7 @@ jobs:
           rm -rf node_modules/.cache
 
       - name: Expo Prebuild
-        run: npx --yes expo prebuild --platform ios
+        run: npx --yes expo@latest prebuild --platform ios
 
       - name: Install Pods
         run: |
