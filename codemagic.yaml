@@ -1,6 +1,6 @@
 workflows:
   ios-sideload:
-    name: Talksy IPA FIX FORCE MODE
+    name: Talksy IPA Fixed Permissions
     max_build_duration: 120
     instance_type: mac_mini_m2
 
@@ -11,24 +11,29 @@ workflows:
 
     scripts:
 
-      # 🔥 FORZA install (risolve gifted-chat conflict)
+      # 📦 install deps (FORCE per evitare conflict gifted-chat)
       - name: Install dependencies
         script: |
           npm install --legacy-peer-deps --force
 
-      # 📱 Expo prebuild (SOLO QUESTO)
+      # 🔧 FIX CRITICO: permessi binari npm (RISOLVE ERRORE 126)
+      - name: Fix npm permissions
+        script: |
+          chmod -R +x node_modules/.bin || true
+
+      # 📱 Expo prebuild (IMPORTANTE: SOLO npx, NON binario locale)
       - name: Expo prebuild
         script: |
           npx expo prebuild --platform ios --clean
 
-      # 🍫 Pods
+      # 🍫 CocoaPods
       - name: Install CocoaPods
         script: |
           cd ios
           pod install --repo-update
 
-      # 🧱 Build iOS unsigned
-      - name: Build iOS
+      # 🧱 Build iOS
+      - name: Build iOS app
         script: |
           xcodebuild -workspace ios/*.xcworkspace \
             -scheme talksy \
