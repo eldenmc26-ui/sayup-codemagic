@@ -11,29 +11,35 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ✅ Node stabile (evita tutti gli EBADENGINE)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # ✅ Install base deps con fix peer deps
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      # 🔥 evita errore "expo permission denied"
       - name: Fix permissions
         run: chmod -R +x node_modules/.bin || true
 
-      # ✅ NON usare expo@latest (rompe tutto)
-      - name: Expo install safe
-        run: npx expo install -- --legacy-peer-deps
+      - name: Expo install
+        run: npx expo install --legacy-peer-deps
 
-      # 🔥 Prebuild pulito
-      - name: Expo Prebuild
+      - name: Expo prebuild
         run: npx expo prebuild --platform ios --clean
 
-      # ✅ CocoaPods stabile
+      # 🔥 FIX CRITICO: aggiunge funzione mancante get_folly_config
+      - name: Patch Podfile (fix folly error)
+        run: |
+          cat << 'EOF' >> ios/Podfile
+
+          # --- FIX CI ---
+          def get_folly_config
+            return { :compiler_flags => "" }
+          end
+          # ---------------
+          EOF
+
       - name: Setup CocoaPods
         run: |
           sudo gem install cocoapods -v 1.15.2
@@ -44,7 +50,6 @@ jobs:
           cd ios
           pod install --repo-update
 
-      # 🧱 Build iOS unsigned
       - name: Build Xcode (Unsigned)
         run: |
           xcodebuild -workspace ios/*.xcworkspace \
@@ -55,14 +60,12 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
 
-      # 📦 IPA packaging
       - name: Package IPA
         run: |
           mkdir Payload
           cp -r build/Build/Products/Release-iphoneos/*.app Payload/
           zip -r Talksy-Sideload.ipa Payload
 
-      # 📤 Upload artifact
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
