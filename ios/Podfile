@@ -14,7 +14,7 @@ target 'talksy' do
   )
 
   # Firebase Pods
-  pod 'Firebase', :tag => '10.22.0'
+pod 'Firebase', :tag => '11.9.0'
   pod 'Firebase/Auth'
   pod 'Firebase/Firestore'
   pod 'Firebase/Database'

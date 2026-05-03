@@ -35,11 +35,11 @@ import javax.annotation.Nonnull;
 
 public class ReactNativeGoogleMobileAdsConsentModule extends ReactNativeModule {
 
-  private static final String TAG = "RNGoogleMobileAdsConsentModule";
+  static final String NAME = "RNGoogleMobileAdsConsentModule";
   private ConsentInformation consentInformation;
 
   public ReactNativeGoogleMobileAdsConsentModule(ReactApplicationContext reactContext) {
-    super(reactContext, TAG);
+    super(reactContext, NAME);
     consentInformation = UserMessagingPlatform.getConsentInformation(reactContext);
   }
 
@@ -274,6 +274,18 @@ public class ReactNativeGoogleMobileAdsConsentModule extends ReactNativeModule {
           PreferenceManager.getDefaultSharedPreferences(getReactApplicationContext());
       String purposeConsents = prefs.getString("IABTCF_PurposeConsents", "");
       promise.resolve(purposeConsents);
+    } catch (Exception e) {
+      rejectPromiseWithCodeAndMessage(promise, "consent-string-error", e.toString());
+    }
+  }
+
+  @ReactMethod
+  public void getPurposeLegitimateInterests(Promise promise) {
+    try {
+      SharedPreferences prefs =
+          PreferenceManager.getDefaultSharedPreferences(getReactApplicationContext());
+      String purposeLegitimateInterests = prefs.getString("IABTCF_PurposeLegitimateInterests", "");
+      promise.resolve(purposeLegitimateInterests);
     } catch (Exception e) {
       rejectPromiseWithCodeAndMessage(promise, "consent-string-error", e.toString());
     }

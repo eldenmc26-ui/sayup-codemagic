@@ -201,11 +201,8 @@ export default function RootNavigator() {
   // Stati Chiamata Globale
   const [activeCall, setActiveCall] = useState<{id: string, data: CallSession} | null>(null);
   const [duration, setDuration] = useState(0);
-  const [localStream, setLocalStream] = useState<any>(null);
-  const [remoteStream, setRemoteStream] = useState<any>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeaker, setIsSpeaker] = useState(true);
-  const [pc, setPc] = useState<any>(null);
   const sbCallRef = useRef<any>(null); // Usiamo any per compatibilità cross-platform
   const outgoingSubRef = useRef<any>(null);
   const ringtoneRef = useRef<any>(null);
@@ -331,8 +328,7 @@ export default function RootNavigator() {
 
   const handleEndInternal = () => {
     setAudioOutput(false);
-    setActiveCall(null);
-    setRemoteStream(null);
+    setActiveCall(null); // Resetta lo stato della chiamata
     stopRingtone();
   };
 
@@ -381,18 +377,6 @@ export default function RootNavigator() {
           <Text style={styles.callTitle}>{activeCall.data.groupName || 'Chiamata Vocale'}</Text>
           <Text style={styles.callStatus}>{activeCall.data.status === 'active' ? formatTime(duration) : isIncoming ? 'CHIAMATA IN ARRIVO' : 'CHIAMATA IN CORSO...'}</Text>
           
-          {activeCall.data.status === 'active' && <View style={styles.controlsRow}>
-              <TouchableOpacity style={[styles.controlBtn, isMuted && styles.controlBtnActive, { marginRight: 20 }]} onPress={toggleMute}>
-                <Ionicons name={isMuted ? "mic-off" : "mic"} size={28} color="#fff" />
-                <Text style={styles.controlLabel}>{isMuted ? "Sblocca" : "Muto"}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={[styles.controlBtn, isSpeaker && styles.controlBtnActive]} onPress={toggleSpeaker}>
-                <Ionicons name={isSpeaker ? "volume-high" : "volume-low"} size={28} color="#fff" />
-                <Text style={styles.controlLabel}>{isSpeaker ? "Vivavoce ON" : "Capsula"}</Text>
-              </TouchableOpacity>
-            </View>}
-
           <View style={styles.callActions}>
             {isIncoming && (
               <TouchableOpacity style={[styles.btn, styles.accept]} onPress={handleAccept}>

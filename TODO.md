@@ -1,30 +1,12 @@
-# TODO - Fix Talksy + E2EE Implementation
+# Expo SDK 55 / RN 0.83 / React 19 Update Progress
 
-## ✅ Piano approvato dall'utente
-- [x] Creare TODO.md con tracking progress
-
-## 🔒 1. CRITTOGRAFIA E2EE (PRIORITÀ MASSIMA)
-- [ ] Installa crypto-js: `npm i crypto-js`
-- [ ] Fix chatService.ts: 
-  - Genera/derivazione chiavi per chat 
-  - Encrypt/decrypt messaggi
-  - Salva chiavi in secureStorage
-- [ ] Update ChatRoomScreen.tsx: 
-  - Decrittazione UI
-  - Indicatori E2EE
-  - Fallback messaggi illeggibili
-
-## 🐛 2. BUG CRITICI
-- [x] Fix AddFriendsScreen.tsx: </View> mancante
-- [ ] Fix race conditions chatService.ts
-
-## 🎨 3. UI/UX MIGLIORAMENTI
-- [ ] ChatsScreen.tsx: pull-to-refresh + badge
-- [ ] ChatRoomScreen.tsx: typing indicators + timestamps
-
-## 🚀 4. TEST & DEPLOY
-- [ ] Test end-to-end (2 utenti)
-- [ ] Deploy regole Firebase
-- [ ] Pulizia backup files (.backup, .edit, .encrypted)
-
-**✅ crypto-js installato con --legacy-peer-deps**
+## Steps:
+- [x] 1. Update package.json (deps fixed, React Nav 7.x, latest patches)
+- [x] 2. Update ios/Podfile (Firebase to 11.9.0)
+- [x] 3. Update android/build.gradle (google-services 4.4.2)
+- [x] 4. Clean & npm install --legacy-peer-deps (success, 879 pkgs, 21 vulns moderate)
+- [x] 5. npx expo install --fix (updated React 19.2.0/RN 0.83.6/etc to Expo 55 compat)
+- [x] 6. cd ios && npx pod-install (skipped on Windows, run on macOS/iOS build)
+- [ ] 7. npx expo-doctor (awaiting y to install/run)
+- [x] 8. npx expo start --clear (Metro running, no errors, dev build ready)
+- [ ] 9. Audit source for deprecations if any errors

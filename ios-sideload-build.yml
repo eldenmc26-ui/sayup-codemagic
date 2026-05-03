@@ -12,18 +12,24 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 18 # O 20, se preferisci una versione più recente
           cache: 'npm'
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
       - name: Expo Prebuild
+        env:
+          # Disabilita Flipper per evitare problemi con get_folly_config
+          EXPO_NO_FLIPPER: 1
         run: |
           chmod +x node_modules/.bin/expo
           npx expo prebuild --platform ios --no-install
 
       - name: Install CocoaPods
+        env:
+          # Disabilita Flipper per evitare problemi con get_folly_config durante pod install
+          EXPO_NO_FLIPPER: 1
         run: cd ios && pod install
 
       - name: Build Xcode (Unsigned)

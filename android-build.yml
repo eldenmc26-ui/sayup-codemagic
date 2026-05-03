@@ -13,11 +13,15 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 18 # O 20, se preferisci una versione più recente
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: npm install
+
+      - name: Grant execute permissions to Expo CLI
+        # Assicura che l'eseguibile di Expo abbia i permessi di esecuzione
+        run: chmod +x node_modules/.bin/expo
 
       - name: Setup Expo and EAS
         uses: expo/expo-github-action@v8
