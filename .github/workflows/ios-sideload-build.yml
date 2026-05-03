@@ -1,10 +1,12 @@
 name: iOS Sideload Build
+
 on:
-  workflow_dispatch: # Permette di avviarlo manualmente dalla scheda Actions su GitHub
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-14  # ⚠️ evita macos-latest (può cambiare versioni)
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -13,24 +15,35 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: 'npm'
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
+      # ✅ FIX 1: installa CocoaPods aggiornato
+      - name: Setup CocoaPods
+        run: |
+          sudo gem install cocoapods -v 1.15.2
+          pod repo update
+
+      # ✅ FIX 2: pulizia completa
+      - name: Clean iOS build
+        run: |
+          rm -rf ios
+          rm -rf node_modules/.cache
+
       - name: Expo Prebuild
         env:
-          # Disabilita Flipper per evitare problemi con get_folly_config
+          EXPO_NO_FLIPPER: 1
+        run: npx expo prebuild --platform ios
+
+      # ✅ FIX 3: pod install pulito
+      - name: Install Pods
+        env:
           EXPO_NO_FLIPPER: 1
         run: |
-          chmod +x node_modules/.bin/expo
-          npx expo prebuild --platform ios --no-install
-
-      - name: Install CocoaPods
-        env:
-          # Disabilita Flipper per evitare problemi con get_folly_config durante pod install
-          EXPO_NO_FLIPPER: 1
-        run: cd ios && pod install
+          cd ios
+          pod deintegrate
+          pod install --repo-update
 
       - name: Build Xcode (Unsigned)
         run: |
