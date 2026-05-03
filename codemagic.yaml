@@ -1,6 +1,6 @@
 workflows:
   ios-sideload:
-    name: Talksy iOS IPA (Fixed Expo Prebuild)
+    name: Talksy IPA FIX FORCE MODE
     max_build_duration: 120
     instance_type: mac_mini_m2
 
@@ -9,42 +9,26 @@ workflows:
       xcode: latest
       cocoapods: default
 
-    cache:
-      cache_paths:
-        - node_modules
-        - ~/.npm
-        - ios/Pods
-
     scripts:
 
-      # 📦 install dependencies (IMPORTANTE per gifted-chat + RN)
+      # 🔥 FORZA install (risolve gifted-chat conflict)
       - name: Install dependencies
         script: |
-          npm install --legacy-peer-deps
+          npm install --legacy-peer-deps --force
 
-      # 🔧 FIX CRITICO: elimina expo-cli legacy globale (causa del tuo errore)
-      - name: Remove legacy Expo CLI
-        script: |
-          npm uninstall -g expo-cli || true
-
-      # 📦 install expo moderno localmente
-      - name: Ensure Expo CLI
-        script: |
-          npm install expo@latest
-
-      # 📱 Expo prebuild (ORA SAFE)
-      - name: Expo prebuild (safe)
+      # 📱 Expo prebuild (SOLO QUESTO)
+      - name: Expo prebuild
         script: |
           npx expo prebuild --platform ios --clean
 
-      # 🍫 CocoaPods install
+      # 🍫 Pods
       - name: Install CocoaPods
         script: |
           cd ios
           pod install --repo-update
 
       # 🧱 Build iOS unsigned
-      - name: Build iOS app
+      - name: Build iOS
         script: |
           xcodebuild -workspace ios/*.xcworkspace \
             -scheme talksy \
@@ -54,7 +38,7 @@ workflows:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
 
-      # 📦 Create IPA
+      # 📦 IPA
       - name: Create IPA
         script: |
           mkdir Payload
@@ -63,11 +47,3 @@ workflows:
 
     artifacts:
       - Talksy.ipa
-
-    publishing:
-      email:
-        recipients:
-          - dev@talksy.app
-        notify:
-          success: true
-          failure: true
