@@ -1,8 +1,8 @@
 workflows:
-  ios-clean-build:
-    name: Talksy iOS Clean Rebuild IPA
-    max_build_duration: 120
+  ios-clean:
+    name: Talksy Clean iOS IPA
     instance_type: mac_mini_m2
+    max_build_duration: 120
 
     environment:
       node: 20
@@ -11,38 +11,37 @@ workflows:
 
     scripts:
 
-      # 💣 NUCLEAR CLEAN (TUTTO RESETTATO OGNI VOLTA)
+      # 💣 NUCLEAR CLEAN
       - name: Clean everything
         script: |
-          echo "🧹 Removing node_modules, ios, pods, caches..."
           rm -rf node_modules
           rm -rf ios
           rm -rf package-lock.json
           npm cache clean --force
 
-      # 📦 Fresh install (forza tutto senza conflitti)
-      - name: Install dependencies fresh
+      # 📦 INSTALL CLEAN (solo da package.json)
+      - name: Install dependencies clean
         script: |
           npm install --legacy-peer-deps --force
 
-      # 🔧 Fix permissions (expo CLI fix)
+      # 🔧 FIX PERMISSIONS (Expo CLI fix CI)
       - name: Fix permissions
         script: |
           chmod -R +x node_modules/.bin || true
 
-      # 📱 Expo prebuild from scratch
-      - name: Expo prebuild clean
+      # 📱 Expo prebuild FRESH
+      - name: Expo prebuild
         script: |
           npx expo prebuild --platform ios --clean
 
-      # 🍫 CocoaPods fresh install
-      - name: Install CocoaPods fresh
+      # 🍫 CocoaPods clean install
+      - name: CocoaPods install
         script: |
           cd ios
           pod install --repo-update
 
-      # 🧱 Build iOS unsigned
-      - name: Build iOS app
+      # 🧱 Build iOS
+      - name: Build iOS
         script: |
           xcodebuild -workspace ios/*.xcworkspace \
             -scheme talksy \
@@ -52,10 +51,10 @@ workflows:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
 
-      # 📦 Create IPA
-      - name: Package IPA
+      # 📦 IPA
+      - name: Create IPA
         script: |
-          mkdir -p Payload
+          mkdir Payload
           cp -r build/Build/Products/Release-iphoneos/*.app Payload/
           zip -r Talksy.ipa Payload
 
