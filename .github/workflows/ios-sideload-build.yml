@@ -11,23 +11,25 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # ✅ Node aggiornato (FONDAMENTALE)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
+      # ✅ install con legacy peer deps
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      # ✅ FIX PERMESSI GLOBALI (IMPORTANTE)
+      # ✅ fix permessi
       - name: Fix node_modules permissions
         run: chmod -R +x node_modules/.bin || true
 
-      # 🔥 USA EXPO DA NPM, NON QUELLO LOCALE
+      # 🔥 FORZA install compatibile
       - name: Fix Expo dependencies
         run: |
-          npx --yes expo@latest install react-native
-          npx --yes expo@latest install
+          npx --yes expo@55 install react-native -- --legacy-peer-deps
+          npx --yes expo@55 install -- --legacy-peer-deps
 
       - name: Setup CocoaPods
         run: |
@@ -40,7 +42,7 @@ jobs:
           rm -rf node_modules/.cache
 
       - name: Expo Prebuild
-        run: npx --yes expo@latest prebuild --platform ios
+        run: npx --yes expo@55 prebuild --platform ios
 
       - name: Install Pods
         run: |
