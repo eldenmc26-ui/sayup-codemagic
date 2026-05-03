@@ -1,6 +1,6 @@
 workflows:
   ios-sideload:
-    name: Talksy iOS IPA (Sideload)
+    name: Talksy iOS IPA (Fixed Expo Prebuild)
     max_build_duration: 120
     instance_type: mac_mini_m2
 
@@ -17,23 +17,28 @@ workflows:
 
     scripts:
 
-      # 📦 Install dependencies (IMPORTANTE: legacy peer deps)
-      - name: Install npm dependencies
+      # 📦 install dependencies (IMPORTANTE per gifted-chat + RN)
+      - name: Install dependencies
         script: |
           npm install --legacy-peer-deps
 
-      # 🔧 Fix Expo CLI issues (evita errori binari / permission)
-      - name: Prepare Expo
+      # 🔧 FIX CRITICO: elimina expo-cli legacy globale (causa del tuo errore)
+      - name: Remove legacy Expo CLI
         script: |
-          npm install -g expo-cli || true
+          npm uninstall -g expo-cli || true
 
-      # 📱 Expo prebuild (GENERA ios folder)
-      - name: Expo prebuild
+      # 📦 install expo moderno localmente
+      - name: Ensure Expo CLI
+        script: |
+          npm install expo@latest
+
+      # 📱 Expo prebuild (ORA SAFE)
+      - name: Expo prebuild (safe)
         script: |
           npx expo prebuild --platform ios --clean
 
       # 🍫 CocoaPods install
-      - name: Install CocoaPods dependencies
+      - name: Install CocoaPods
         script: |
           cd ios
           pod install --repo-update
