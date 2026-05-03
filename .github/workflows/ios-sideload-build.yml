@@ -1,4 +1,4 @@
-name: iOS IPA Build (WORKING)
+name: iOS IPA Build (Stable)
 
 on:
   workflow_dispatch:
@@ -8,46 +8,52 @@ jobs:
     runs-on: macos-14
 
     steps:
+      # 📥 Checkout
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 🔥 Node stabile compatibile Expo
-      - name: Setup Node
+      # 🟢 Node stabile compatibile Expo tooling
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # 📦 install base deps (senza rompere alberi dipendenze)
+      # 📦 Install dependencies (IMPORTANTE legacy-peer-deps qui)
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      # 🔥 FIX CHIAVE: usa Expo compatibile invece di latest
-      - name: Install Expo compatible
+      # 🔧 Fix permission error expo binary
+      - name: Fix permissions
         run: |
-          npx expo install -- --legacy-peer-deps
-          npx expo install react-native -- --legacy-peer-deps
+          chmod -R +x node_modules/.bin || true
+          npm rebuild
 
-      # 🧹 pulizia iOS
-      - name: Clean ios
+      # 📱 Expo install SAFE (NO node_modules expo call diretto)
+      - name: Expo install safe
+        run: npx --yes expo install
+
+      # 🧹 Clean iOS folder (evita conflitti pod vecchi)
+      - name: Clean iOS
         run: rm -rf ios
 
-      # 📱 prebuild stabile
+      # 📱 Expo prebuild pulito
       - name: Expo prebuild
-        run: npx expo prebuild --platform ios --clean
+        run: npx --yes expo prebuild --platform ios --clean
 
-      # 🔧 CocoaPods stabile
+      # 🍫 CocoaPods setup stabile
       - name: Setup CocoaPods
         run: |
           sudo gem install cocoapods -v 1.15.2
           pod repo update
 
+      # 📦 Install Pods
       - name: Install Pods
         run: |
           cd ios
-          pod install
+          pod install --repo-update
 
-      # 🧱 build unsigned IPA
-      - name: Build iOS
+      # 🧱 Build iOS unsigned
+      - name: Build Xcode
         run: |
           xcodebuild -workspace ios/*.xcworkspace \
             -scheme talksy \
@@ -57,14 +63,14 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
 
-      # 📦 IPA packaging
-      - name: Create IPA
+      # 📦 Create IPA
+      - name: Package IPA
         run: |
           mkdir Payload
           cp -r build/Build/Products/Release-iphoneos/*.app Payload/
           zip -r Talksy.ipa Payload
 
-      # 📤 artifact
+      # 📤 Upload artifact
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
