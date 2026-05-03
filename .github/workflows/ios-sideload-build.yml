@@ -27,7 +27,7 @@ jobs:
 
       # ✅ NON usare expo@latest (rompe tutto)
       - name: Expo install safe
-        run: npx expo install --legacy-peer-deps
+        run: npx expo install -- --legacy-peer-deps
 
       # 🔥 Prebuild pulito
       - name: Expo Prebuild
