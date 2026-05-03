@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14  # ⚠️ evita macos-latest (può cambiare versioni)
+    runs-on: macos-14
 
     steps:
       - name: Checkout repository
@@ -19,24 +19,27 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      # ✅ FIX 1: installa CocoaPods aggiornato
+      # ✅ CocoaPods aggiornato
       - name: Setup CocoaPods
         run: |
           sudo gem install cocoapods -v 1.15.2
           pod repo update
 
-      # ✅ FIX 2: pulizia completa
-      - name: Clean iOS build
+      # ✅ pulizia per evitare bug strani
+      - name: Clean project
         run: |
           rm -rf ios
           rm -rf node_modules/.cache
 
+      # ✅ FIX PERMISSION + prebuild
       - name: Expo Prebuild
         env:
           EXPO_NO_FLIPPER: 1
-        run: npx expo prebuild --platform ios
+        run: |
+          chmod +x node_modules/.bin/expo
+          npx expo prebuild --platform ios
 
-      # ✅ FIX 3: pod install pulito
+      # ✅ install pods pulito
       - name: Install Pods
         env:
           EXPO_NO_FLIPPER: 1
@@ -45,6 +48,7 @@ jobs:
           pod deintegrate
           pod install --repo-update
 
+      # ✅ build Xcode senza firma
       - name: Build Xcode (Unsigned)
         run: |
           xcodebuild -workspace ios/*.xcworkspace \
@@ -55,13 +59,15 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
 
+      # ✅ crea IPA
       - name: Package IPA
         run: |
           mkdir Payload
           cp -r build/Build/Products/Release-iphoneos/*.app Payload/
           zip -r Talksy-Sideload.ipa Payload
 
-      - name: Upload Artifact
+      # ✅ upload
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: Talksy-iOS-IPA
