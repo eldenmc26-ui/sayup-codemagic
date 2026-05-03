@@ -11,13 +11,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ✅ Node aggiornato (FONDAMENTALE)
+      # ✅ Node 20
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # ✅ install con legacy peer deps
+      # 🔥 FORZA XCODE 16
+      - name: Select Xcode 16
+        run: sudo xcode-select -s /Applications/Xcode_16.app
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      # ✅ install deps
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
@@ -25,7 +32,7 @@ jobs:
       - name: Fix node_modules permissions
         run: chmod -R +x node_modules/.bin || true
 
-      # 🔥 FORZA install compatibile
+      # 🔥 fix Expo + RN
       - name: Fix Expo dependencies
         run: |
           npx --yes expo@55 install react-native -- --legacy-peer-deps
