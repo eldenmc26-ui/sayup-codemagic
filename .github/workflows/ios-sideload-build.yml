@@ -1,4 +1,4 @@
-name: iOS Sideload Build
+name: iOS IPA Build (WORKING)
 
 on:
   workflow_dispatch:
@@ -11,35 +11,31 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      # 🔥 Node stabile compatibile Expo
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
+      # 📦 install base deps (senza rompere alberi dipendenze)
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Fix permissions
-        run: chmod -R +x node_modules/.bin || true
+      # 🔥 FIX CHIAVE: usa Expo compatibile invece di latest
+      - name: Install Expo compatible
+        run: |
+          npx expo install -- --legacy-peer-deps
+          npx expo install react-native -- --legacy-peer-deps
 
-      - name: Expo install
-        run: npx expo install -- --legacy-peer-deps
+      # 🧹 pulizia iOS
+      - name: Clean ios
+        run: rm -rf ios
 
+      # 📱 prebuild stabile
       - name: Expo prebuild
         run: npx expo prebuild --platform ios --clean
 
-      # 🔥 FIX CRITICO: aggiunge funzione mancante get_folly_config
-      - name: Patch Podfile (fix folly error)
-        run: |
-          cat << 'EOF' >> ios/Podfile
-
-          # --- FIX CI ---
-          def get_folly_config
-            return { :compiler_flags => "" }
-          end
-          # ---------------
-          EOF
-
+      # 🔧 CocoaPods stabile
       - name: Setup CocoaPods
         run: |
           sudo gem install cocoapods -v 1.15.2
@@ -48,9 +44,10 @@ jobs:
       - name: Install Pods
         run: |
           cd ios
-          pod install --repo-update
+          pod install
 
-      - name: Build Xcode (Unsigned)
+      # 🧱 build unsigned IPA
+      - name: Build iOS
         run: |
           xcodebuild -workspace ios/*.xcworkspace \
             -scheme talksy \
@@ -60,14 +57,16 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
 
-      - name: Package IPA
+      # 📦 IPA packaging
+      - name: Create IPA
         run: |
           mkdir Payload
           cp -r build/Build/Products/Release-iphoneos/*.app Payload/
-          zip -r Talksy-Sideload.ipa Payload
+          zip -r Talksy.ipa Payload
 
+      # 📤 artifact
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: Talksy-iOS-IPA
-          path: Talksy-Sideload.ipa
+          name: Talksy-IPA
+          path: Talksy.ipa
