@@ -20,13 +20,14 @@ jobs:
 
       # 📦 Install dependencies (IMPORTANTE legacy-peer-deps qui)
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: |
+          npm install --legacy-peer-deps
 
       # 🔧 Fix permission error expo binary
       - name: Fix permissions
         run: |
           chmod -R +x node_modules/.bin || true
-          npm rebuild
+          npx expo-doctor --fix || true
 
       # 📱 Expo install SAFE (NO node_modules expo call diretto)
       - name: Expo install safe
