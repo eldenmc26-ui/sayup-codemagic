@@ -1,0 +1,55 @@
+name: iOS Manual Sideload Build
+on:
+  workflow_dispatch: # Questo ti permette di farlo partire a mano premendo il tasto "Run workflow"
+
+jobs:
+  build:
+    runs-on: macos-14 # Usiamo macOS 14 per compatibilità con le ultime librerie
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20 # Necessario per Expo 55
+          cache: 'npm'
+
+      - name: Install dependencies
+        # Fondamentale usare legacy-peer-deps per React 19
+        run: npm install --legacy-peer-deps
+
+      - name: Expo Prebuild
+        env:
+          EXPO_NO_FLIPPER: 1 # Disabilita Flipper per evitare problemi nativi
+        run: npx expo prebuild --platform ios --clean --no-install
+
+      - name: Install CocoaPods
+        env:
+          EXPO_NO_FLIPPER: 1
+        run: |
+          cd ios
+          pod install
+
+      - name: Build Xcode (Unsigned)
+        run: |
+          xcodebuild -workspace ios/*.xcworkspace \
+            -scheme talksy \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
+
+      - name: Package IPA for Sideloadly
+        run: |
+          mkdir Payload
+          cp -r build/Build/Products/Release-iphoneos/*.app Payload/
+          zip -r Talksy-Sideload.ipa Payload
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Talksy-IPA-Sideload
+          path: Talksy-Sideload.ipa
