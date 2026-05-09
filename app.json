@@ -2,31 +2,36 @@
   "expo": {
     "name": "Talksy",
     "slug": "talksy",
-    "version": "55.0.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/talksy-logo.png",
     "userInterfaceStyle": "dark",
+
     "splash": {
       "image": "./assets/talksy-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#075E54"
     },
+
     "assetBundlePatterns": [
       "**/*"
     ],
+
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.xxmauro.talksy",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Talksy ha bisogno del microfono per le chiamate vocali.",
-        "NSCameraUsageDescription": "Talksy ha bisogno della fotocamera per scattare foto e videochiamate.",
-        "NSPhotoLibraryUsageDescription": "Talksy ha bisogno di accedere alla tua galleria per inviare immagini."
+        "NSMicrophoneUsageDescription": "Talksy usa il microfono per le chiamate vocali.",
+        "NSCameraUsageDescription": "Talksy usa la fotocamera per videochiamate e foto.",
+        "NSPhotoLibraryUsageDescription": "Talksy accede alla galleria per inviare immagini."
       }
     },
+
     "android": {
       "package": "com.xxmauro.talksy",
       "googleServicesFile": "./google-services.json"
     },
+
     "plugins": [
       [
         "expo-build-properties",
@@ -37,13 +42,6 @@
           "ios": {
             "newArchEnabled": false
           }
-        }
-      ],
-      [
-        "react-native-google-mobile-ads",
-        {
-          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
-          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
         }
       ]
     ]
