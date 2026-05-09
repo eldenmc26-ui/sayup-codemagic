@@ -7,7 +7,8 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "lint": "eslint . --ext .ts,.tsx"
+    "lint": "eslint . --ext .ts,.tsx",
+    "postinstall": "find node_modules -name \"Podfile\" -exec rm -rf {} + && chmod -R +x node_modules/.bin || true"
   },
 
   "dependencies": {
