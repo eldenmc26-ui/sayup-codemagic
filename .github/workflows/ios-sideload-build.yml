@@ -38,7 +38,10 @@ jobs:
 
       # 📱 Expo prebuild pulito
       - name: Expo prebuild
-        run: npx --yes expo prebuild --platform ios --clean
+        env:
+          # Forza la disabilitazione di Flipper che causa problemi con folly config
+          EXPO_NO_FLIPPER: 1
+        run: npx expo prebuild --platform ios --clean --no-install
 
       # 🍫 CocoaPods setup stabile
       - name: Setup CocoaPods
@@ -48,9 +51,11 @@ jobs:
 
       # 📦 Install Pods
       - name: Install Pods
+        env:
+          EXPO_NO_FLIPPER: 1
         run: |
           cd ios
-          pod install --repo-update
+          pod install
 
       # 🧱 Build iOS unsigned
       - name: Build Xcode
