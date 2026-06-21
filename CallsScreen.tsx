@@ -10,12 +10,12 @@ import { subscribeFriends } from './friendService';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { TalksyUser } from './authService';
+import type { SayUpUser } from './authService';
 
 export default function CallsScreen() {
   const [history, setHistory] = useState<any[]>([]);
   const [ showNewCallModal, setShowNewCallModal ] = useState(false);
-  const [ friends, setFriends ] = useState<TalksyUser[]>([]);
+  const [ friends, setFriends ] = useState<SayUpUser[]>([]);
   const [ selectedFriends, setSelectedFriends ] = useState<string[]>([]);
   const [ callGroupName, setCallGroupName ] = useState('');
   const myUid = Auth.currentUser?.uid;
@@ -38,12 +38,21 @@ export default function CallsScreen() {
 
   const handleStartNewCall = async () => {
     if (selectedFriends.length === 0) return;
+
+    let defaultCallName = 'Chiamata di gruppo';
+    if (selectedFriends.length === 1) {
+      const selectedFriend = friends.find(f => f.uid === selectedFriends[0] || (f as any).id === selectedFriends[0]);
+      defaultCallName = selectedFriend ? selectedFriend.displayName : 'Chiamata vocale';
+    } else {
+      defaultCallName = 'Chiamata di gruppo';
+    }
+
     const chatIdForCall = selectedFriends.length === 1 
       ? await getOrCreateChat(selectedFriends[0])
       : `group_${Date.now()}`;
 
     try {
-      await startVoiceCall(chatIdForCall, selectedFriends, callGroupName || 'Chiamata di gruppo');
+      await startVoiceCall(chatIdForCall, selectedFriends, callGroupName || defaultCallName);
       setShowNewCallModal(false);
       setSelectedFriends([]);
       setCallGroupName('');
@@ -173,6 +182,7 @@ export default function CallsScreen() {
 
 const s = StyleSheet.create({
   root:       { flex: 1, backgroundColor: COLORS.background },
+  headerActions: { paddingHorizontal: 16, paddingTop: 12 },
   newCallButton: {
     flexDirection: 'row',
     backgroundColor: COLORS.primary,
@@ -218,6 +228,8 @@ const s = StyleSheet.create({
   emptyIconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center', marginBottom: 16, borderWidth: 1, borderColor: COLORS.border },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text, marginBottom: 8 },
   emptySubtitle: { fontSize: 14, color: COLORS.textSoft, textAlign: 'center', lineHeight: 20 },
+  modalContainer: { flex: 1, padding: 20, backgroundColor: COLORS.background },
+  emptyText: { color: COLORS.textSoft, textAlign: 'center', marginTop: 16 },
 
   groupInput: { backgroundColor: COLORS.surface, padding: 12, borderRadius: 10, marginBottom: 15, borderWidth: 1, borderColor: COLORS.border },
   friendItem: { flexDirection: 'row', alignItems: 'center', padding: 12, backgroundColor: COLORS.surface, borderRadius: 12, marginBottom: 8, gap: 12 },

@@ -9,10 +9,11 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useRoute } from '@react-navigation/native';
 import { ensureChatParticipants, subscribeToMessages, sendMessage, setTyping, subscribeChats, startVoiceCall, deleteMessage, updateMessage } from './chatService';
 import { Auth, Firestore, Collections } from './firebase';
-import type { TalksyUser } from './authService';
+import type { SayUpUser } from './authService';
 import type { Message, Chat } from './chatService';
 import { format } from 'date-fns';
 import { COLORS } from './theme';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 type Props = NativeStackScreenProps<any, 'ChatRoom'>;
  
@@ -25,7 +26,7 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
   const [sending, setSending]   = useState(false);
   const [loading, setLoading]   = useState(true);
   const [chatInfo, setChatInfo] = useState<Chat | null>(null);
-  const [otherUser, setOtherUser] = useState<TalksyUser | null>(null);
+  const [otherUser, setOtherUser] = useState<SayUpUser | null>(null);
   const listRef                 = useRef<FlatList<Message>>(null); // Specifica il tipo per FlatList
   const typingTimer             = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -66,8 +67,7 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
       (chats) => {
         const current = chats.find((c) => c.id === chatId);
         if (current) setChatInfo(current); // chatInfo ora contiene chatKey
-      },
-      () => {},
+      }
     );
     return unsub;
   }, [chatId]);
@@ -77,7 +77,7 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
       const otherId = chatInfo.participants.find((p) => p !== myUid);
       if (otherId) {
         Firestore.collection(Collections.USERS).doc(otherId).get().then((doc: any) => {
-          if (doc.exists) setOtherUser(doc.data() as TalksyUser);
+          if (doc.exists) setOtherUser(doc.data() as SayUpUser);
         });
       }
     }
@@ -212,7 +212,9 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
       </View>
 
       <View style={styles.inputBar}>
-        <TouchableOpacity onPress={handlePickImage} style={styles.attachBtn}><Text style={{fontSize: 22}}>⊕</Text></TouchableOpacity>
+        <TouchableOpacity onPress={handlePickImage} style={styles.attachBtn}>
+          <Ionicons name="attach" size={26} color={COLORS.primary} />
+        </TouchableOpacity>
         <TextInput
           style={styles.input}
           value={text}
@@ -230,7 +232,7 @@ export default function ChatRoomScreen({ route, navigation }: Props) {
         >
           {sending
             ? <ActivityIndicator size='small' color='#fff' />
-            : <Text style={styles.sendIcon}>➤</Text>
+            : <Ionicons name="send" size={18} color={COLORS.white} />
           }
         </TouchableOpacity>
       </View>
@@ -271,7 +273,13 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
   chatImage: { width: 200, height: 200, borderRadius: 10, marginBottom: 4 },
-  attachBtn: { paddingHorizontal: 10, justifyContent: 'center' },
+  attachBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   senderName: { fontSize: 11, color: COLORS.primary, fontWeight: '600', marginBottom: 2 },
   bubbleText:      { fontSize: 16, lineHeight: 21, color: '#000' },
   bubbleTextMine:  { color: '#000' },
@@ -282,7 +290,7 @@ const styles = StyleSheet.create({
 
   inputBar: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     padding: 10,
     gap: 8,
     backgroundColor: COLORS.surface,
@@ -309,7 +317,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sendBtnDisabled: { backgroundColor: '#BFDBFE' },
-  sendIcon:        { color: COLORS.white, fontSize: 16, marginLeft: 2 },
 
   empty:     { flex: 1, alignItems: 'center', paddingTop: 80 },
   emptyText: { color: COLORS.textMuted, textAlign: 'center', lineHeight: 22 },

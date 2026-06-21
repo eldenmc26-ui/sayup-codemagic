@@ -38,23 +38,38 @@ service cloud.firestore {
           || (
               request.resource.data.diff(resource.data).affectedKeys().hasOnly(['incomingFriendRequests'])
               && request.resource.data.incomingFriendRequests.hasAll([request.auth.uid])
-              && !resource.data.incomingFriendRequests.hasAll([request.auth.uid])
+              && (!("incomingFriendRequests" in resource.data) || !resource.data.incomingFriendRequests.hasAll([request.auth.uid]))
           )
-          // A user can accept/decline a request (update outgoingFriendRequests of targetUid)
+          // A user can decline a request (remove themselves from outgoingFriendRequests of targetUid)
           || (
               request.resource.data.diff(resource.data).affectedKeys().hasOnly(['outgoingFriendRequests'])
-              && (
-                  (request.resource.data.outgoingFriendRequests.hasAll([request.auth.uid]) && !resource.data.outgoingFriendRequests.hasAll([request.auth.uid]))
-                  || (!request.resource.data.outgoingFriendRequests.hasAll([request.auth.uid]) && resource.data.outgoingFriendRequests.hasAll([request.auth.uid]))
-              )
+              && ("outgoingFriendRequests" in resource.data)
+              && resource.data.outgoingFriendRequests.hasAll([request.auth.uid])
+              && !request.resource.data.outgoingFriendRequests.hasAll([request.auth.uid])
+          )
+          // A user can accept a request (remove themselves from outgoingFriendRequests and add themselves to friends of targetUid)
+          || (
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['outgoingFriendRequests', 'friends'])
+              && ("outgoingFriendRequests" in resource.data)
+              && resource.data.outgoingFriendRequests.hasAll([request.auth.uid])
+              && !request.resource.data.outgoingFriendRequests.hasAll([request.auth.uid])
+              && request.resource.data.friends.hasAll([request.auth.uid])
+              && (!("friends" in resource.data) || !resource.data.friends.hasAll([request.auth.uid]))
+          )
+          // A user can remove themselves from targetUid's friends list
+          || (
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friends'])
+              && ("friends" in resource.data)
+              && resource.data.friends.hasAll([request.auth.uid])
+              && !request.resource.data.friends.hasAll([request.auth.uid])
           )
         );
     }
 
     // ── Utenti ──────────────────────────────────────
     match /users/{uid} {
-      // Chiunque autenticato può leggere i profili (per ricerca amici)
-      allow read: if isAuthenticated();
+      // Chiunque può leggere i profili (anche non autenticati per consentire la verifica del nickname alla registrazione)
+      allow read: if true;
 
       // Solo il proprietario può creare/modificare il proprio profilo
       allow create: if isOwner(uid) && isValidUser(request.resource.data);
@@ -73,8 +88,11 @@ service cloud.firestore {
       // Tutti gli autenticati possono leggere le news
       allow read: if isAuthenticated();
 
-      // Solo gli admin possono creare news
-      allow create: if isAdmin();
+      // Solo gli admin possono creare news, tutti possono creare post
+      allow create: if isAuthenticated() && (
+        request.resource.data.type == 'post'
+        || isAdmin()
+      );
 
       // Il creatore o un admin possono modificare
       allow update: if isAdmin()
@@ -130,6 +148,24 @@ service cloud.firestore {
 
       // Solo il destinatario può eliminare/marcare come lette
       allow update, delete: if isAuthenticated() && resource.data.targetUid == request.auth.uid;
+    }
+
+    // ── Cronologia chiamate e Signaling WebRTC ───────
+    match /call_history/{callId} {
+      allow read, update, delete: if isAuthenticated()
+        && request.auth.uid in resource.data.participants;
+
+      allow create: if isAuthenticated()
+        && request.auth.uid in request.resource.data.participants;
+
+      match /callerCandidates/{candId} {
+        allow read, write: if isAuthenticated()
+          && request.auth.uid in get(/databases/$(database)/documents/call_history/$(callId)).data.participants;
+      }
+      match /calleeCandidates/{candId} {
+        allow read, write: if isAuthenticated()
+          && request.auth.uid in get(/databases/$(database)/documents/call_history/$(callId)).data.participants;
+      }
     }
 
     // ── Annunci / Sponsor personalizzati ─────────────

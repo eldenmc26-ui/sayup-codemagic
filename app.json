@@ -1,49 +1,67 @@
 {
   "expo": {
-    "name": "Talksy",
-    "slug": "talksy",
+    "name": "SayUp",
+    "slug": "sayup",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/talksy-logo.png",
     "userInterfaceStyle": "dark",
-
     "splash": {
       "image": "./assets/talksy-logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#075E54"
     },
-
     "assetBundlePatterns": [
       "**/*"
     ],
-
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.xxmauro.talksy",
+      "bundleIdentifier": "com.xxmauro.sayup",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Talksy usa il microfono per le chiamate vocali.",
-        "NSCameraUsageDescription": "Talksy usa la fotocamera per videochiamate e foto.",
-        "NSPhotoLibraryUsageDescription": "Talksy accede alla galleria per inviare immagini."
+        "NSMicrophoneUsageDescription": "SayUp usa il microfono per le chiamate vocali.",
+        "NSCameraUsageDescription": "SayUp usa la fotocamera per videochiamate e foto.",
+        "NSPhotoLibraryUsageDescription": "SayUp accede alla galleria per inviare immagini.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
-
     "android": {
-      "package": "com.xxmauro.talksy",
+      "package": "com.xxmauro.sayup",
       "googleServicesFile": "./google-services.json"
     },
-
     "plugins": [
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Consenti a SayUp di usare il FaceID per l'accesso rapido."
+        }
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-4696380411829532~3234904120",
+          "iosAppId": "ca-app-pub-4696380411829532~3234904120"
+        }
+      ],
       [
         "expo-build-properties",
         {
           "android": {
-            "newArchEnabled": false
+            "newArchEnabled": false,
+            "compileSdkVersion": 34,
+            "targetSdkVersion": 34,
+            "buildToolsVersion": "34.0.0"
           },
           "ios": {
             "newArchEnabled": false
           }
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "3d34ff14-c35d-4e2e-a31a-f800c197ba13"
+      }
+    }
   }
 }

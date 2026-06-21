@@ -6,7 +6,7 @@ workflows:
     max_build_duration: 120
 
     environment:
-      node: 20
+      node: 18 # Expo SDK 50 richiede Node 18
       xcode: latest
       cocoapods: default
 
@@ -45,7 +45,7 @@ workflows:
       - name: Build iOS
         script: |
           xcodebuild -workspace ios/*.xcworkspace \
-            -scheme talksy \
+            -scheme SayUp \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath build \

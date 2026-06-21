@@ -2,7 +2,13 @@ import { Auth, Firestore, Database, Collections, RTDBPaths, Storage, FirestoreFi
 import CryptoJS from 'crypto-js';
 import { Platform, DeviceEventEmitter, Alert } from 'react-native';
 
-const SendbirdCalls = Platform.OS !== 'web' ? require('@sendbird/calls-react-native').SendbirdCalls : null;
+let webrtcModulePromise: Promise<any> | null = null;
+function getWebRTC() {
+  if (!webrtcModulePromise) {
+    webrtcModulePromise = import('react-native-webrtc');
+  }
+  return webrtcModulePromise;
+}
 
 export type Chat = TalksyChat & { isGroup?: boolean; groupName?: string; groupImage?: string | null; unread?: Record<string, number>; lastTs?: number; chatKey?: string };
 export interface ChatMessage {
@@ -25,21 +31,46 @@ export interface Message {
   content: string;
   senderId: string;
   timestamp: number;
+  type?: 'text' | 'image';
 }
 
-export function subscribeChats(callback: (chats: TalksyChat[]) => void): () => void {
+export function subscribeChats(
+  callback: (chats: TalksyChat[]) => void,
+  onError?: () => void,
+): () => void {
   const uid = Auth.currentUser?.uid;
   if (!uid) return () => {};
 
   return Firestore.collection(Collections.CHATS)
     .where('participants', 'array-contains', uid)
-    .onSnapshot((snap: any) => {
-      const chats = snap.docs.map((doc: any) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as TalksyChat[];
-      callback(chats);
-    });
+    .onSnapshot(
+      (snap: any) => {
+        const chats = snap.docs.map((doc: any) => {
+          const data = doc.data();
+          const chatKey = data.chatKey;
+          let lastMessage = data.lastMessage;
+          if (chatKey && lastMessage) {
+            try {
+              const decrypted = CryptoJS.AES.decrypt(lastMessage, chatKey).toString(CryptoJS.enc.Utf8);
+              if (decrypted) {
+                lastMessage = decrypted;
+              }
+            } catch (e) {
+              // Fallback se il messaggio era in chiaro (retrocompatibilità)
+            }
+          }
+          return {
+            id: doc.id,
+            ...data,
+            lastMessage,
+          };
+        }) as TalksyChat[];
+        callback(chats);
+      },
+      () => {
+        onError?.();
+      }
+    );
 }
 
 function generateAESKey(): string {
@@ -90,7 +121,7 @@ export function subscribeToMessages(chatId: string, callback: (msgs: Message[]) 
       return callback([]);
     }
     // Recupera la chiave di chat da Firestore per decrittografare i messaggi
-    Firestore.collection(Collections.CHATS).doc(chatId).get().then(chatDoc => {
+    Firestore.collection(Collections.CHATS).doc(chatId).get().then((chatDoc: any) => {
       const chatKey = chatDoc.data()?.chatKey;
       const msgs = Object.keys(data).map(key => {
         const msg = { id: key, ...data[key] };
@@ -132,9 +163,12 @@ export async function sendMessage(chatId: string, content: string, chatKey: stri
     type,
   };
 
+  const lastMessageText = type === 'image' ? '📷 Immagine' : content.slice(0, 30);
+  const encryptedLastMessage = CryptoJS.AES.encrypt(lastMessageText, chatKey).toString();
+
   await Database.ref(RTDBPaths.messages(chatId)).push(msgData);
   await Firestore.collection(Collections.CHATS).doc(chatId).update({
-    lastMessage: type === 'image' ? '📷 Immagine' : content.slice(0, 30),
+    lastMessage: encryptedLastMessage,
     lastTs: Date.now(),
     updatedAt: Date.now(),
   });
@@ -170,9 +204,15 @@ export async function setTyping(chatId: string, isTyping: boolean) {
   else await ref.remove();
 }
 
-export async function ensureChatParticipants(chatId: string) {
-  // Logica opzionale per sincronizzare i permessi RTDB
-  return Promise.resolve();
+export async function ensureChatParticipants(chatId: string): Promise<void> {
+  const doc = await Firestore.collection(Collections.CHATS).doc(chatId).get();
+  if (!doc.exists) return;
+  const participants = doc.data()?.participants || [];
+  const participantsObj: Record<string, boolean> = {};
+  participants.forEach((uid: string) => {
+    participantsObj[uid] = true;
+  });
+  await Database.ref(`chatParticipants/${chatId}`).set(participantsObj);
 }
 
 export interface CallSession {
@@ -191,39 +231,90 @@ export async function startVoiceCall(chatId: string, participants: string[], gro
 
   if (Platform.OS === 'web') throw new Error('Le chiamate non sono supportate su Web');
   
-  if (!SendbirdCalls) {
-    Alert.alert('Errore modulo', 'Il sistema di chiamata non è disponibile in Expo Go. È necessaria una Development Build.');
-    return;
-  }
-
-  const otherUid = participants[0]; // Chiamata 1:1 per i test
-
   try {
-    const dialParams = {
-      userId: otherUid,
-      isVideoCall: false,
-      callOption: { audioEnabled: true },
+    const { RTCPeerConnection, mediaDevices, RTCSessionDescription, RTCIceCandidate } = await getWebRTC();
+    const callRef = Firestore.collection(Collections.CALL_HISTORY).doc();
+    const callData: CallSession = { 
+      chatId, 
+      participants: [...new Set([...participants, myUid])], 
+      callerId: myUid,
+      groupName: groupName || 'Chiamata vocale',
+      status: 'dialing', 
+      createdAt: Date.now(),
+      type: 'voice'
     };
 
-    const call = await SendbirdCalls.dial(dialParams);
-
-    // Avvisa il RootNavigator che abbiamo iniziato una chiamata in uscita
-    DeviceEventEmitter.emit('ON_OUTGOING_CALL', call);
-
-    await Firestore.collection(Collections.CALL_HISTORY).add({
-      callerId: myUid,
-      participants: [myUid, otherUid],
-      type: 'voice',
-      createdAt: Date.now(),
-      groupName: groupName || 'Chiamata vocale',
+    // Inizializza PeerConnection per creare l'offerta (CHIAMANTE)
+    const pc: any = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
     });
 
-    return call;
+    // Ottieni stream audio locale e aggiungilo alla PeerConnection
+    const stream = (await mediaDevices.getUserMedia({ audio: true, video: false })) as any;
+    stream.getTracks().forEach((track: any) => pc.addTrack(track, stream));
+
+    // Salva ICE candidates locali su Firestore
+    pc.onicecandidate = (event: any) => {
+      if (event.candidate) {
+        callRef.collection('callerCandidates').add(event.candidate.toJSON());
+      }
+    };
+
+    // Salva record chiamata + offerta SDP su Firestore prima di avviare i listener,
+    // in modo che le regole di sicurezza (che controllano l'esistenza del documento padre) passino correttamente.
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    await callRef.set({
+      ...callData,
+      offer: { sdp: offer.sdp, type: offer.type }
+    });
+
+    console.log('[WebRTC] Signaling document creato:', callRef.id);
+
+    // Ascolta Answer e ICE candidates del destinatario
+    const unsub1 = callRef.onSnapshot(
+      async (snapshot: any) => {
+        if (!snapshot) return;
+        const data = snapshot.data();
+        if (data?.answer && !pc.remoteDescription) {
+          await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+          DeviceEventEmitter.emit('ON_CALL_ACTIVE', { id: callRef.id });
+        }
+        if (data?.status === 'ended') {
+          pc.close();
+          stream.getTracks().forEach((t: any) => t.stop());
+          DeviceEventEmitter.emit('ON_CALL_ENDED', { id: callRef.id });
+        }
+      },
+      (error: any) => {
+        console.log('[WebRTC] callRef snapshot error:', error.message);
+      }
+    );
+
+    const unsub2 = callRef.collection('calleeCandidates').onSnapshot(
+      (snap: any) => {
+        if (!snap || typeof snap.docChanges !== 'function') return;
+        snap.docChanges().forEach(async (change: any) => {
+          if (change.type === 'added') {
+            await pc.addIceCandidate(new RTCIceCandidate(change.doc.data()));
+          }
+        });
+      },
+      (error: any) => {
+        console.log('[WebRTC] calleeCandidates snapshot error:', error.message);
+      }
+    );
+
+    DeviceEventEmitter.emit('ON_OUTGOING_CALL', { 
+      ...callData, 
+      id: callRef.id,
+      pc,
+      stream,
+      unsub1,
+      unsub2
+    });
   } catch (e) {
-    console.error('[Sendbird] Dial error:', e);
-    if (e.message?.includes('not authenticated')) {
-      Alert.alert('Errore', 'Il sistema di chiamata non è ancora pronto. Riprova tra un istante.');
-    }
     throw e;
   }
 }
@@ -251,6 +342,7 @@ export async function addParticipantsToGroup(chatId: string, newUids: string[]) 
     participants: merged,
     updatedAt: Date.now()
   });
+  await ensureChatParticipants(chatId);
 }
 
 export function subscribeCallHistory(callback: (history: any[]) => void) {

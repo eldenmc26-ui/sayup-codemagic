@@ -1,6 +1,6 @@
 // src/services/newsService.ts
 import { Firestore, Collections, Auth, FirestoreFieldValue } from './firebase';
-import type { TalksyUser } from './authService';
+import type { SayUpUser } from './authService';
 
 export interface NewsItem {
   id: string;
@@ -12,6 +12,8 @@ export interface NewsItem {
   imageUrl: string | null;
   createdAt: number;
   createdBy: string;
+  type?: 'news' | 'post';
+  authorName?: string;
   likes?: Record<string, boolean>;
   commentsCount?: number;
 }
@@ -76,6 +78,8 @@ export async function createNews(
     imageUrl,
     createdAt: Date.now(),
     createdBy: Auth.currentUser!.uid,
+    type: 'news',
+    authorName: 'Staff SayUp',
     likes: {},
     commentsCount: 0,
   };
@@ -83,10 +87,10 @@ export async function createNews(
 
   const allUsers = await Firestore.collection(Collections.USERS).get();
   for (const doc of allUsers.docs) {
-    const user = doc.data() as TalksyUser;
+    const user = doc.data() as SayUpUser;
     if (user.fcmToken) {
       await Firestore.collection('notifications').add({
-        title: 'Nuova news su Talksy!',
+        title: 'Nuova news su SayUp!',
         body: `${title} — ${category}`,
         type: 'news',
         targetUid: user.uid,
@@ -95,6 +99,39 @@ export async function createNews(
       });
     }
   }
+}
+
+// Crea un post (qualsiasi utente)
+export async function createPost(
+  title: string,
+  description: string,
+  category: string,
+  imageUrl: string | null,
+): Promise<void> {
+  const ref = Firestore.collection(Collections.NEWS).doc();
+  const uid = Auth.currentUser!.uid;
+
+  // Recupera il nome dell'utente corrente da USERS
+  const userDoc = await Firestore.collection(Collections.USERS).doc(uid).get();
+  const userData = userDoc.data() as SayUpUser | undefined;
+  const authorName = userData?.displayName || userData?.nickname || 'Utente';
+
+  const item: NewsItem = {
+    id: ref.id,
+    title,
+    description,
+    source: 'SayUp Community',
+    category,
+    url: '',
+    imageUrl,
+    createdAt: Date.now(),
+    createdBy: uid,
+    type: 'post',
+    authorName,
+    likes: {},
+    commentsCount: 0,
+  };
+  await ref.set(item);
 }
 
 export async function updateNews(
@@ -136,7 +173,7 @@ export async function addComment(
   let fallbackName = resolvedName;
   if (!fallbackName) {
     const myDoc = await Firestore.collection(Collections.USERS).doc(resolvedUid).get();
-    const myUser = myDoc.data() as TalksyUser | undefined;
+    const myUser = myDoc.data() as SayUpUser | undefined;
     fallbackName = myUser?.displayName || myUser?.nickname || 'Utente';
   }
 

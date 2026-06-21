@@ -1,4 +1,4 @@
-name: iOS IPA Build (Stable)
+name: iOS Sideload Build
 
 on:
   workflow_dispatch:
@@ -8,77 +8,65 @@ jobs:
     runs-on: macos-14
 
     steps:
-      # 📥 Checkout
-      - name: Checkout repository
+      # 📥 Checkout del codice
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # 🟢 Node stabile compatibile Expo tooling
-      - name: Setup Node.js
+      # 🟢 Setup Node 20 (Richiesto da Expo 55)
+      - name: Setup Node
         uses: actions/setup-node@v4
-        with:
-          node-version: 20
+        with: # Expo SDK 52 richiede Node 18
+          node-version: 18 # Expo SDK 50 richiede Node 18
+          cache: 'npm'
 
-      # 📦 Install dependencies (IMPORTANTE legacy-peer-deps qui)
-      - name: Install dependencies
+      # 📦 Installazione dipendenze (Usa .npmrc per legacy-peer-deps)
+      - name: Install Dependencies
+        run: npm install
+
+      # 🧹 Pulizia profonda node_modules (Fix per l'errore Example.xcworkspace)
+      - name: Cleanup node_modules junk
         run: |
-          npm install --legacy-peer-deps
+          find node_modules -name "Podfile" -exec rm -rf {} + || true
+          find node_modules -name "*.xcworkspace" -exec rm -rf {} + || true
 
-      # 🔧 Fix permission error expo binary
-      - name: Fix permissions
-        run: |
-          chmod -R +x node_modules/.bin || true
-          npx expo-doctor --fix || true
-
-      # 📱 Expo install SAFE (NO node_modules expo call diretto)
-      - name: Expo install safe
-        run: npx --yes expo install
-
-      # 🧹 Clean iOS folder (evita conflitti pod vecchi)
-      - name: Clean iOS
-        run: rm -rf ios
-
-      # 📱 Expo prebuild pulito
-      - name: Expo prebuild
+      # 📱 Expo Prebuild (Generazione cartella ios)
+      - name: Expo Prebuild
         env:
-          # Forza la disabilitazione di Flipper che causa problemi con folly config
           EXPO_NO_FLIPPER: 1
-        run: npx expo prebuild --platform ios --clean --no-install
+        run: npx expo prebuild --platform ios --clean --no-install # --no-install per evitare pod install automatico
 
-      # 🍫 CocoaPods setup stabile
-      - name: Setup CocoaPods
-        run: |
-          sudo gem install cocoapods -v 1.15.2
-          pod repo update
-
-      # 📦 Install Pods
+      # 🍫 Installazione CocoaPods
       - name: Install Pods
+        working-directory: ios
         env:
           EXPO_NO_FLIPPER: 1
-        run: |
-          cd ios
-          pod install
+        run: pod install # Installazione dei pod
 
-      # 🧱 Build iOS unsigned
+      # 🧱 Build Xcode Unsigned (Tutti i flag extra inclusi)
       - name: Build Xcode
         run: |
           xcodebuild -workspace ios/*.xcworkspace \
-            -scheme talksy \
+            -scheme sayup \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGNING_REQUIRED=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            DEVELOPMENT_TEAM=""
 
-      # 📦 Create IPA
+      # 📦 Creazione pacchetto IPA per Sideloadly
       - name: Package IPA
         run: |
           mkdir Payload
           cp -r build/Build/Products/Release-iphoneos/*.app Payload/
-          zip -r Talksy.ipa Payload
+          zip -r SayUp.ipa Payload
 
-      # 📤 Upload artifact
+      # 📤 Caricamento file finale
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: Talksy-IPA
-          path: Talksy.ipa
+          name: SayUp-IPA
+          path: SayUp.ipa

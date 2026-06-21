@@ -1,6 +1,6 @@
-# 🚀 TALKSY — Guida Setup Completa
+# 🚀 SAYUP — Guida Setup Completa
 
-## 📁 Struttura Finale
+## 📁 Struttura Progetto
 
 ```
 talksy/
@@ -44,8 +44,8 @@ talksy/
 
 ### 1️⃣ Installa Node modules
 ```bash
-cd talksy
-npm install
+npm install --legacy-peer-deps
+npx expo prebuild
 ```
 
 ### 2️⃣ Setup Firebase Android

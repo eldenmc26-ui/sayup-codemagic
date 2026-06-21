@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, Alert, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { Auth, firebase, Firestore, Collections } from './firebase'; 
-import { searchUsers, TalksyUser } from './authService';
+import { Auth, Firestore, Collections } from './firebase'; 
+import { searchUsers } from './authService';
+import type { SayUpUser } from './authService';
 import { sendFriendRequest, acceptFriendRequest, declineFriendRequest, removeFriend } from './friendService';
 import { COLORS } from './theme';
 import { useStore } from './useStore';
@@ -13,13 +14,13 @@ export default function AddFriendsScreen() {
   const navigation = useNavigation();
   const { user, setUser } = useStore(); // Ottieni setUser dallo store
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<TalksyUser[]>([]);
+  const [searchResults, setSearchResults] = useState<SayUpUser[]>([]);
   const [loading, setLoading] = useState(false);
   const [requestingUid, setRequestingUid] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('search');
-  const [pendingProfiles, setPendingProfiles] = useState<TalksyUser[]>([]);
-  const [sentProfiles, setSentProfiles] = useState<TalksyUser[]>([]);
-  const [friendsProfiles, setFriendsProfiles] = useState<TalksyUser[]>([]);
+  const [pendingProfiles, setPendingProfiles] = useState<SayUpUser[]>([]);
+  const [sentProfiles, setSentProfiles] = useState<SayUpUser[]>([]);
+  const [friendsProfiles, setFriendsProfiles] = useState<SayUpUser[]>([]);
 
   // Carica i profili per le richieste in sospeso o inviate
   useEffect(() => {
@@ -35,7 +36,7 @@ export default function AddFriendsScreen() {
         const snap = await Firestore.collection(Collections.USERS)
           .where('uid', 'in', ids.slice(0, 10)) // Max 10 per volta per limiti Firestore query
           .get();
-        const profiles = snap.docs.map((d: any) => d.data() as TalksyUser);
+        const profiles = snap.docs.map((d: any) => d.data() as SayUpUser);
         if (activeTab === 'pending') setPendingProfiles(profiles); else if (activeTab === 'sent') setSentProfiles(profiles); else setFriendsProfiles(profiles);
       } catch (e) {
         console.error(e);
@@ -176,7 +177,7 @@ export default function AddFriendsScreen() {
     );
   };
 
-  const renderUserItem = (person: TalksyUser) => {
+  const renderUserItem = (person: SayUpUser) => {
     const color = colorFor(person.uid);
     const isFriend = user?.friends?.includes(person.uid);
     const isOutgoing = user?.outgoingFriendRequests?.includes(person.uid);
@@ -341,11 +342,6 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: COLORS.white,
     fontWeight: 'bold',
-  },
-  emptyText: {
-    textAlign: 'center',
-    marginTop: 20,
-    color: COLORS.textMuted,
   },
   acceptBtn: { backgroundColor: COLORS.success, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
   declineBtn: { backgroundColor: COLORS.danger, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },

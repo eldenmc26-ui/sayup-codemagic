@@ -1,5 +1,5 @@
 name: Android Build
-on:
+on: # Trigger manuale per il workflow
   push:
     branches: [ main ]
 
@@ -12,8 +12,8 @@ jobs:
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
-        with:
-          node-version: 18 # O 20, se preferisci una versione più recente
+        with: # Expo SDK 52 richiede Node 18
+          node-version: 18 # Expo SDK 50 richiede Node 18
           cache: 'npm'
 
       - name: Install dependencies

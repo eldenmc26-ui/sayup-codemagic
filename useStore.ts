@@ -2,21 +2,21 @@
 // Stato globale dell'app con un piccolo external store compatibile web/native
 
 import { useSyncExternalStore } from 'react';
-import type { TalksyUser } from './authService';
+import type { SayUpUser } from './authService';
 
 interface AppState {
   // Auth
-  user: TalksyUser | null;
+  user: SayUpUser | null;
   loading: boolean;
 
   // Actions
-  setUser: (user: TalksyUser | null) => void;
+  setUser: (user: SayUpUser | null) => void;
   setLoading: (loading: boolean) => void;
   logout: () => void;
 }
 
 type StoreState = {
-  user: TalksyUser | null;
+  user: SayUpUser | null;
   loading: boolean;
 };
 

@@ -25,11 +25,11 @@ export function subscribeToUserPresence(uid: string, callback: (isOnline: boolea
 
   const listener = userPresenceRef.on(
     'value',
-    (snapshot) => {
+    (snapshot: any) => {
       const isOnline = snapshot.val() === true;
       callback(isOnline);
     },
-    (error) => {
+    (error: any) => {
       console.error('Error subscribing to user presence:', error);
       callback(false); // Assume offline on error
     },

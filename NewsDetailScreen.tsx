@@ -35,8 +35,10 @@ export default function NewsDetailScreen() {
     const isCreator = news.createdBy === myUid;
     const canEdit = user?.isAdmin || isCreator;
     const canDelete = user?.isAdmin || isCreator;
+    const isPost = news.type !== 'news';
 
     navigation.setOptions({
+      title: isPost ? 'Post Community' : 'News Ufficiale',
       headerRight: () => (
         <View style={{ flexDirection: 'row', gap: 16, marginRight: 12 }}>
           {canEdit && (
@@ -47,7 +49,7 @@ export default function NewsDetailScreen() {
           {canDelete && (
             <TouchableOpacity
               onPress={() => {
-                Alert.alert('Elimina news', 'Sei sicuro?', [
+                Alert.alert(isPost ? 'Elimina post' : 'Elimina news', 'Sei sicuro?', [
                   { text: 'Annulla', style: 'cancel' },
                   {
                     text: 'Elimina', style: 'destructive', onPress: async () => {
@@ -143,11 +145,16 @@ export default function NewsDetailScreen() {
         <Text style={s.title}>{news.title}</Text>
         {news.description ? <Text style={s.description}>{news.description}</Text> : null}
 
-        <Text style={s.sourceLabel}>Fonte: {news.source}</Text>
-
-        <TouchableOpacity onPress={() => openLink(news.url)} activeOpacity={0.7}>
-          <Text style={s.link} numberOfLines={2}>{news.url}</Text>
-        </TouchableOpacity>
+        {news.type === 'news' ? (
+          <>
+            <Text style={s.sourceLabel}>Fonte: {news.source}</Text>
+            <TouchableOpacity onPress={() => openLink(news.url)} activeOpacity={0.7}>
+              <Text style={s.link} numberOfLines={2}>{news.url}</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <Text style={s.authorLabel}>Postato da @{news.authorName || 'Utente'}</Text>
+        )}
 
         <View style={s.actionsRow}>
           <TouchableOpacity style={s.actionBtn} onPress={handleLike} activeOpacity={0.8}>
@@ -210,6 +217,7 @@ const s = StyleSheet.create({
 
   sourceLabel: { fontSize: 13, color: COLORS.text, fontWeight: '600', marginBottom: 6 },
   link: { fontSize: 13, color: COLORS.primary, textDecorationLine: 'underline', marginBottom: 18 },
+  authorLabel: { fontSize: 13, color: COLORS.textMuted, fontWeight: '500', marginBottom: 18 },
 
   actionsRow: { flexDirection: 'row', gap: 20, marginBottom: 20 },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },

@@ -17,7 +17,7 @@ import firebase, { Auth } from './firebase';
 import { setUserOnline, subscribeToUserPresence } from './presenceService';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
-import type { TalksyUser } from './authService'; 
+import type { SayUpUser } from './authService'; 
 import { COLORS } from './theme'; 
 import { useStore } from './useStore';
 import { useMemo } from 'react';
@@ -25,12 +25,12 @@ import { useMemo } from 'react';
 export default function ChatsScreen() {
   const navigation = useNavigation<any>();
   const searchRef = useRef<TextInput>(null);
-  const { user } = useStore();
+  const { user, setUser } = useStore();
 
   const [chats, setChats] = useState<Chat[]>([]);
   const [searchQ, setSearchQ] = useState('');
-  const [friends, setFriends] = useState<TalksyUser[]>([]);
-  const [searchResults, setSearchResults] = useState<TalksyUser[]>([]);
+  const [friends, setFriends] = useState<SayUpUser[]>([]);
+  const [searchResults, setSearchResults] = useState<SayUpUser[]>([]);
   const [searching, setSearching] = useState(false);
   const [requestingUid, setRequestingUid] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -113,7 +113,7 @@ export default function ChatsScreen() {
       try {
         const found = await searchUsers(query);
         setSearchResults(
-          found.filter((candidate: TalksyUser) => candidate.uid !== Auth.currentUser?.uid), // Explicitly type 'candidate'
+          found.filter((candidate: SayUpUser) => candidate.uid !== Auth.currentUser?.uid), // Explicitly type 'candidate'
         );
       } finally {
         setSearching(false);
@@ -235,7 +235,7 @@ export default function ChatsScreen() {
           style={[s.actionButton, s.actionButtonSecondary]}
           onPress={() => navigation.navigate('CreateGroup')}
           activeOpacity={0.85}
-        > {/* Corretto: Crea gruppo */}
+        >
           <Text style={s.actionButtonTextSecondary}>Crea gruppo</Text>
         </TouchableOpacity>
       </View>
@@ -255,7 +255,7 @@ export default function ChatsScreen() {
       {/* Chat list */}
       {loading || searching
         ? <ActivityIndicator style={{ marginTop: 40 }} color={COLORS.primary} />
-        : ( // Corretto: Visualizza la lista combinata
+        : (
           <FlatList
             data={combinedList}
             keyExtractor={item => (item as any).id || (item as any).uid}
@@ -268,7 +268,7 @@ export default function ChatsScreen() {
             renderItem={({ item: chat }) => {
               // Renderizza i risultati di ricerca (se presenti)
               if ('nickname' in chat) {
-                const person = chat as TalksyUser;
+                const person = chat as SayUpUser;
                 const color = colorFor(person.uid);
                 return (
                   <TouchableOpacity style={s.chatItem} onPress={() => openChat(person.uid)}>
@@ -277,9 +277,9 @@ export default function ChatsScreen() {
                     </View>
                     <View style={s.chatInfo}>
                       <Text style={s.chatName}>{person.displayName}</Text>
-                      <Text style={s.chatPreview}>@{person.nickname}</Text>
+                      <Text style={s.chatPreview} numberOfLines={1}>@{person.nickname}{person.bio ? ` • ${person.bio}` : ''}</Text>
                     </View>
-                    <View style={s.chatMeta}> {/* Aggiungi logica per richieste di amicizia */}
+                    <View style={s.chatMeta}>
                       {isFriend(person.uid) ? (
                         <Text style={s.chatTime}>Amico</Text>
                       ) : user?.outgoingFriendRequests?.includes(person.uid) ? (
@@ -300,7 +300,7 @@ export default function ChatsScreen() {
 
               const isGroup = chat.isGroup;
               if (isGroup) {
-                const unread = chat.unread?.[Auth.currentUser?.uid ?? ''] ?? 0; // Contatore non letti
+                const unread = chat.unread?.[Auth.currentUser?.uid ?? ''] ?? 0;
                 return (
                   <TouchableOpacity
                     style={s.chatItem}
@@ -330,7 +330,7 @@ export default function ChatsScreen() {
               const unread = chat.unread?.[Auth.currentUser?.uid ?? ''] ?? 0;
               const color = colorFor(otherId);
               const friend = friends.find((entry) => entry.uid === otherId);
-              const isOnline = onlineStatuses[otherId]; // Get online status
+              const isOnline = onlineStatuses[otherId];
 
               return (
                 <TouchableOpacity
@@ -338,17 +338,19 @@ export default function ChatsScreen() {
                   onPress={() => navigation.navigate('ChatRoom', { chatId: chat.id })}
                   activeOpacity={0.7}
                 >
-                  <View> {/* Wrap avatar e indicatore online */}
-                    {friend?.photoURL ? <Image source={{ uri: friend.photoURL }} style={s.avatar} /> : (
+                  <View>
+                    {friend?.photoURL ? (
+                      <Image source={{ uri: friend.photoURL }} style={s.avatar} />
+                    ) : (
                       <View style={[s.avatar, { backgroundColor: color.bg }]}>
                         <Text style={[s.avatarText, { color: color.text }]}>
                           {getInitials(friend?.displayName ?? otherId.slice(0, 4).toUpperCase())}
                         </Text>
                       </View>
                     )}
-                    {otherId && ( // Mostra indicatore online solo per chat 1:1 con un otherId valido
+                    {!!otherId ? (
                       <View style={[s.onlineIndicator, isOnline ? s.online : s.offline]} />
-                    )}
+                    ) : null}
                   </View>
                   <View style={s.chatInfo}>
                     <Text style={s.chatName}>{friend?.displayName ?? otherId}</Text>
@@ -569,9 +571,7 @@ const s = StyleSheet.create({
   },
   chatInfo:    { flex: 1, minWidth: 0 },
   chatName:    { fontSize: 15, fontWeight: '600', color: COLORS.text },
-  chatPreview: { fontSize: 13, color: COLORS.textMuted, marginTop: 3 },
   chatMeta:    { alignItems: 'flex-end', gap: 4 },
-  chatTime:    { fontSize: 11, color: COLORS.textSoft },
   badge: {
     backgroundColor: COLORS.primary, borderRadius: 10,
     minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center',

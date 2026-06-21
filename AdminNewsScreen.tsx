@@ -1,5 +1,5 @@
 // src/screens/AdminNewsScreen.tsx
-// Pannello admin per creare/modificare news
+// Pannello per creare/modificare news e post
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -8,14 +8,16 @@ import {
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { createNews, updateNews, subscribeNewsItem } from './newsService';
+import { createNews, createPost, updateNews, subscribeNewsItem } from './newsService';
 import { Storage, Auth } from './firebase';
 import { COLORS } from './theme';
+import { useStore } from './useStore';
 
 const CATEGORIES = ['Tech', 'Sport', 'Finanza', 'Musica', 'Politica', 'Scienza', 'Cinema', 'Gaming', 'Viaggi', 'Cucina'];
 
 export default function AdminNewsScreen({ navigation }: any) {
   const route = useRoute<any>();
+  const { user } = useStore();
   const editingNewsId = route.params?.newsId as string | undefined;
 
   const [title, setTitle]       = useState('');
@@ -26,6 +28,8 @@ export default function AdminNewsScreen({ navigation }: any) {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
   const [loading, setLoading]   = useState(false);
+
+  const isPost = !user?.isAdmin;
 
   useEffect(() => {
     if (!editingNewsId) return;
@@ -64,10 +68,15 @@ export default function AdminNewsScreen({ navigation }: any) {
   }
 
   async function handleSubmit() {
-    if (!title.trim() || !source.trim() || !url.trim()) {
-      Alert.alert('Errore', 'Compila tutti i campi');
+    if (!title.trim()) {
+      Alert.alert('Errore', 'Inserisci un titolo');
       return;
     }
+    if (!isPost && (!source.trim() || !url.trim())) {
+      Alert.alert('Errore', 'Compila tutti i campi obbligatori per le news');
+      return;
+    }
+
     setLoading(true);
     try {
       const imageUrl = await uploadImage();
@@ -75,22 +84,32 @@ export default function AdminNewsScreen({ navigation }: any) {
         await updateNews(editingNewsId, {
           title: title.trim(),
           description: description.trim(),
-          source: source.trim(),
+          source: isPost ? 'SayUp Community' : source.trim(),
           category,
-          url: url.trim(),
+          url: isPost ? '' : url.trim(),
           imageUrl,
         });
-        Alert.alert('✅ Fatto', 'News aggiornata');
+        Alert.alert('✅ Fatto', isPost ? 'Post aggiornato' : 'News aggiornata');
       } else {
-        await createNews(
-          title.trim(),
-          description.trim(),
-          source.trim(),
-          category,
-          url.trim(),
-          imageUrl,
-        );
-        Alert.alert('✅ Fatto', 'News pubblicata');
+        if (isPost) {
+          await createPost(
+            title.trim(),
+            description.trim(),
+            category,
+            imageUrl,
+          );
+          Alert.alert('✅ Fatto', 'Post pubblicato');
+        } else {
+          await createNews(
+            title.trim(),
+            description.trim(),
+            source.trim(),
+            category,
+            url.trim(),
+            imageUrl,
+          );
+          Alert.alert('✅ Fatto', 'News pubblicata');
+        }
         setTitle('');
         setDescription('');
         setSource('');
@@ -99,7 +118,7 @@ export default function AdminNewsScreen({ navigation }: any) {
       }
       navigation.goBack();
     } catch (e: any) {
-      Alert.alert('Errore', e.message ?? 'Impossibile salvare la news');
+      Alert.alert('Errore', e.message ?? 'Impossibile salvare il contenuto');
     } finally {
       setLoading(false);
     }
@@ -109,49 +128,57 @@ export default function AdminNewsScreen({ navigation }: any) {
 
   return (
     <ScrollView style={s.root} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
-      <Text style={s.title}>{editingNewsId ? 'Modifica news' : 'Crea nuova news'}</Text>
+      <Text style={s.title}>
+        {editingNewsId 
+          ? (isPost ? 'Modifica post' : 'Modifica news') 
+          : (isPost ? 'Crea nuovo post' : 'Crea nuova news')}
+      </Text>
 
       <Text style={s.label}>Titolo</Text>
       <TextInput
         style={s.input}
         value={title}
         onChangeText={setTitle}
-        placeholder="Es. Apple annuncia il nuovo chip M4"
+        placeholder={isPost ? "Scrivi un titolo accattivante..." : "Es. Apple annuncia il nuovo chip M4"}
         placeholderTextColor="#aaa"
         maxLength={200}
       />
 
-      <Text style={s.label}>Descrizione</Text>
+      <Text style={s.label}>Descrizione / Contenuto</Text>
       <TextInput
         style={[s.input, s.inputMulti]}
         value={description}
         onChangeText={setDescription}
-        placeholder="Riassunto breve della news..."
+        placeholder="Scrivi il corpo del post o un riassunto..."
         placeholderTextColor="#aaa"
         multiline
         maxLength={500}
       />
 
-      <Text style={s.label}>Fonte</Text>
-      <TextInput
-        style={s.input}
-        value={source}
-        onChangeText={setSource}
-        placeholder="Es. TechCrunch"
-        placeholderTextColor="#aaa"
-        maxLength={50}
-      />
+      {!isPost && (
+        <>
+          <Text style={s.label}>Fonte</Text>
+          <TextInput
+            style={s.input}
+            value={source}
+            onChangeText={setSource}
+            placeholder="Es. TechCrunch"
+            placeholderTextColor="#aaa"
+            maxLength={50}
+          />
 
-      <Text style={s.label}>URL</Text>
-      <TextInput
-        style={s.input}
-        value={url}
-        onChangeText={setUrl}
-        placeholder="https://..."
-        placeholderTextColor="#aaa"
-        autoCapitalize="none"
-        keyboardType="url"
-      />
+          <Text style={s.label}>URL Fonte</Text>
+          <TextInput
+            style={s.input}
+            value={url}
+            onChangeText={setUrl}
+            placeholder="https://..."
+            placeholderTextColor="#aaa"
+            autoCapitalize="none"
+            keyboardType="url"
+          />
+        </>
+      )}
 
       <Text style={s.label}>Categoria</Text>
       <View style={s.tagsWrap}>
@@ -180,7 +207,11 @@ export default function AdminNewsScreen({ navigation }: any) {
       >
         {loading
           ? <ActivityIndicator color="#fff" />
-          : <Text style={s.btnText}>{editingNewsId ? 'Salva modifiche' : 'Pubblica news'}</Text>
+          : <Text style={s.btnText}>
+              {editingNewsId 
+                ? 'Salva modifiche' 
+                : (isPost ? 'Pubblica post' : 'Pubblica news')}
+            </Text>
         }
       </TouchableOpacity>
     </ScrollView>

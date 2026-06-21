@@ -4,6 +4,7 @@
 import React, { useEffect } from 'react';
 import { StatusBar, Alert, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import mobileAds from 'react-native-google-mobile-ads';
 import RootNavigator from './RootNavigator';
 import {
   registerFCMToken,
@@ -14,7 +15,17 @@ import {
 } from './notificationService';
 
 export default function App() {
+  const handleNotificationNavigation = (data: any) => {
+    console.log('[App] Gestione navigazione notifica:', data);
+    // Qui potrai aggiungere la logica per saltare alla chat specifica in futuro
+  };
+
   useEffect(() => {
+    mobileAds()
+      .initialize()
+      .then(() => console.log('[AdMob] Mobile Ads SDK initialized'))
+      .catch((error) => console.warn('[AdMob] init failed', error));
+
     // 1. Registra token FCM e ascolta aggiornamenti
     registerFCMToken();
     const unsubRefresh = listenTokenRefresh();

@@ -14,7 +14,7 @@ export default function WelcomeScreen({ navigation }: Props) {
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
 
-      <View style={styles.hero}><Image source={require('./assets/talksy-logo.png')} style={styles.logo} resizeMode="contain" /><Text style={styles.title}>Talksy</Text><Text style={styles.subtitle}>Messaggi, amici e news in un posto solo.{'\n'}Semplice, pulita, sempre tua.</Text></View>
+      <View style={styles.hero}><Image source={require('./assets/talksy-logo.png')} style={styles.logo} resizeMode="contain" /><Text style={styles.title}>SayUp</Text><Text style={styles.subtitle}>Messaggi, amici e news in un posto solo.{'\n'}Semplice, veloce, sicura.</Text></View>
 
       <View style={styles.actions}>
         <TouchableOpacity

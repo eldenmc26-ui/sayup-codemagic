@@ -19,15 +19,13 @@ export default function NewsScreen() {
   const [news, setNews]           = useState<NewsItem[]>([]);
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'news' | 'post'>('all');
 
   useLayoutEffect(() => {
-    if (!user?.isAdmin) {
-      navigation.setOptions({ headerRight: undefined });
-      return;
-    }
-
+    const showCreate = activeFilter !== 'news' || user?.isAdmin;
     navigation.setOptions({
-      headerRight: () => (
+      headerTitle: 'Feed Post',
+      headerRight: () => showCreate ? (
         <TouchableOpacity
           onPress={() => navigation.navigate('AdminNews')}
           activeOpacity={0.8}
@@ -35,9 +33,9 @@ export default function NewsScreen() {
         >
           <Text style={{ color: COLORS.white, fontSize: 14, fontWeight: '600' }}>Crea</Text>
         </TouchableOpacity>
-      ),
+      ) : null,
     });
-  }, [navigation, user?.isAdmin]);
+  }, [navigation, activeFilter, user?.isAdmin]);
 
   useEffect(() => {
     if (!user) {
@@ -94,19 +92,51 @@ export default function NewsScreen() {
     Cucina:   '#FF5722',
   };
 
+  const filteredNews = news.filter(item => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'news') return item.type === 'news';
+    if (activeFilter === 'post') return item.type === 'post';
+    return true;
+  });
+
   return (
     <View style={s.root}>
       {user?.isAdmin && (
         <View style={s.adminBanner}>
-          <Text style={s.adminText}>👑 Sei admin — puoi gestire le news</Text>
+          <Text style={s.adminText}>👑 Sei admin — puoi gestire news e post</Text>
         </View>
       )}
+
+      {/* Selettore filtri feed */}
+      <View style={s.filterRow}>
+        <TouchableOpacity
+          style={[s.filterTab, activeFilter === 'all' && s.filterTabActive]}
+          onPress={() => setActiveFilter('all')}
+          activeOpacity={0.8}
+        >
+          <Text style={[s.filterTabText, activeFilter === 'all' && s.filterTabTextActive]}>Tutti</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[s.filterTab, activeFilter === 'news' && s.filterTabActive]}
+          onPress={() => setActiveFilter('news')}
+          activeOpacity={0.8}
+        >
+          <Text style={[s.filterTabText, activeFilter === 'news' && s.filterTabTextActive]}>📢 Annunci</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[s.filterTab, activeFilter === 'post' && s.filterTabActive]}
+          onPress={() => setActiveFilter('post')}
+          activeOpacity={0.8}
+        >
+          <Text style={[s.filterTabText, activeFilter === 'post' && s.filterTabTextActive]}>💬 Community</Text>
+        </TouchableOpacity>
+      </View>
 
       {loading
         ? <ActivityIndicator style={{ marginTop: 40 }} color={COLORS.primary} />
         : (
           <FlatList
-            data={news}
+            data={filteredNews}
             keyExtractor={n => n.id}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.primary} />
@@ -120,30 +150,49 @@ export default function NewsScreen() {
               <View style={s.empty}>
                 <Text style={s.emptyIcon}>📰</Text>
                 <Text style={s.emptyText}>
-                  Niente da vedere qui.
+                  Nessun post trovato in questa categoria.
                 </Text>
               </View>
             }
-            renderItem={({ item: n, index }) => (
-              <TouchableOpacity
-                style={s.newsItem}
-                onPress={() => openNewsDetail(n.id)}
-                activeOpacity={0.7}
-              >
-                <View style={[s.categoryPill, { backgroundColor: categoryColors[n.category] ?? '#888' }]}>
-                  <Text style={s.categoryText}>{n.category}</Text>
-                </View>
-                <Text style={s.newsTitle}>{n.title}</Text>
-                {n.description ? <Text style={s.newsDescription}>{n.description}</Text> : null}
-                {n.imageUrl ? <Image source={{ uri: n.imageUrl }} style={s.newsImage} /> : null}
-                <Text style={s.sourceLabel}>Fonte: {n.source}</Text>
-                <Text style={s.link} numberOfLines={1}>{n.url}</Text>
-                <View style={s.newsMeta}>
-                  <Text style={s.newsTime}>{timeAgo(n.createdAt)}</Text>
-                  <Text style={s.stats}>❤️ {Object.keys(n.likes ?? {}).length}  💬 {n.commentsCount ?? 0}</Text>
-                </View>
-              </TouchableOpacity>
-            )}
+            renderItem={({ item: n }) => {
+              const isNews = n.type === 'news';
+              return (
+                <TouchableOpacity
+                  style={s.newsItem}
+                  onPress={() => openNewsDetail(n.id)}
+                  activeOpacity={0.7}
+                >
+                  <View style={s.itemHeader}>
+                    <View style={[s.categoryPill, { backgroundColor: categoryColors[n.category] ?? '#888' }]}>
+                      <Text style={s.categoryText}>{n.category}</Text>
+                    </View>
+                    {isNews ? (
+                      <View style={s.newsBadge}>
+                        <Text style={s.newsBadgeText}>📢 Ufficiale</Text>
+                      </View>
+                    ) : (
+                      <Text style={s.authorText}>da @{n.authorName || 'Utente'}</Text>
+                    )}
+                  </View>
+
+                  <Text style={s.newsTitle}>{n.title}</Text>
+                  {n.description ? <Text style={s.newsDescription}>{n.description}</Text> : null}
+                  {n.imageUrl ? <Image source={{ uri: n.imageUrl }} style={s.newsImage} /> : null}
+
+                  {isNews && (
+                    <View style={s.sourceContainer}>
+                      <Text style={s.sourceLabel}>Fonte: {n.source}</Text>
+                      <Text style={s.link} numberOfLines={1}>{n.url}</Text>
+                    </View>
+                  )}
+
+                  <View style={s.newsMeta}>
+                    <Text style={s.newsTime}>{timeAgo(n.createdAt)}</Text>
+                    <Text style={s.stats}>❤️ {Object.keys(n.likes ?? {}).length}  💬 {n.commentsCount ?? 0}</Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            }}
           />
         )
       }
@@ -163,6 +212,36 @@ const s = StyleSheet.create({
   },
   adminText: { fontSize: 13, color: COLORS.primaryDark, textAlign: 'center' },
 
+  filterRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 8,
+    backgroundColor: COLORS.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  filterTab: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: COLORS.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterTabActive: {
+    backgroundColor: COLORS.primarySoft,
+  },
+  filterTabText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: COLORS.textMuted,
+  },
+  filterTabTextActive: {
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+
   newsItem: {
     padding: 16,
     marginHorizontal: 14,
@@ -171,6 +250,28 @@ const s = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: 18,
     backgroundColor: COLORS.surface,
+  },
+  itemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  newsBadge: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  newsBadgeText: {
+    fontSize: 10,
+    color: COLORS.danger,
+    fontWeight: '700',
+  },
+  authorText: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    fontWeight: '500',
   },
   newsImage: {
     width: '100%',
@@ -184,7 +285,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
-    marginBottom: 8,
   },
   categoryText: { fontSize: 11, color: '#fff', fontWeight: '600', textTransform: 'uppercase' },
   newsTitle:    { fontSize: 15, fontWeight: '600', color: COLORS.text, lineHeight: 22, marginBottom: 6 },
@@ -192,8 +292,14 @@ const s = StyleSheet.create({
   newsMeta:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
   newsTime:     { fontSize: 12, color: COLORS.textSoft },
   stats:        { fontSize: 12, color: COLORS.textMuted },
-  sourceLabel:  { fontSize: 13, color: COLORS.text, fontWeight: '600', marginTop: 10 },
-  link:         { fontSize: 12, color: COLORS.primary, textDecorationLine: 'underline', marginTop: 4, marginBottom: 4 },
+  sourceContainer: {
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    paddingTop: 8,
+    marginTop: 8,
+  },
+  sourceLabel:  { fontSize: 13, color: COLORS.text, fontWeight: '600' },
+  link:         { fontSize: 12, color: COLORS.primary, textDecorationLine: 'underline', marginTop: 2, marginBottom: 4 },
 
   empty:     { alignItems: 'center', paddingTop: 80, gap: 12, paddingHorizontal: 32 },
   emptyIcon: { fontSize: 48 },

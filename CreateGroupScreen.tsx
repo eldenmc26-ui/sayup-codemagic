@@ -7,12 +7,12 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { subscribeFriends } from './friendService'; // Corretto il percorso di importazione
 import { createGroupChat } from './chatService'; // Mantenuto createGroupChat da chatService
-import type { TalksyUser } from './authService';
+import type { SayUpUser } from './authService';
 import { COLORS } from './theme';
 
 export default function CreateGroupScreen() {
   const navigation = useNavigation<any>();
-  const [friends, setFriends] = useState<TalksyUser[]>([]);
+  const [friends, setFriends] = useState<SayUpUser[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [groupName, setGroupName] = useState('');
   const [loading, setLoading] = useState(false);

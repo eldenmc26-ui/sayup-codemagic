@@ -1,7 +1,7 @@
 import { Auth, Firestore, Collections, FirestoreFieldValue } from './firebase';
-import type { TalksyUser } from './authService';
+import type { SayUpUser } from './authService';
 
-export function subscribeFriends(callback: (friends: TalksyUser[]) => void, onError: () => void) {
+export function subscribeFriends(callback: (friends: SayUpUser[]) => void, onError: () => void) {
   const uid = Auth.currentUser?.uid;
   if (!uid) return () => {};
 
@@ -17,7 +17,7 @@ export function subscribeFriends(callback: (friends: TalksyUser[]) => void, onEr
         .where('uid', 'in', friendIds)
         .get();
       
-      callback(friendsQuery.docs.map((d: any) => d.data() as TalksyUser));
+      callback(friendsQuery.docs.map((d: any) => ({ uid: d.id, ...d.data() }) as SayUpUser));
     }, onError);
 }
 

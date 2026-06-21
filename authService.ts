@@ -2,13 +2,15 @@
 // Gestione account: registrazione con TOTP, login, logout
 
 import { Auth, Firestore, Collections } from './firebase';
-import { TOTP } from 'otpauth';
+import CryptoJS from 'crypto-js';
+import { Secret, TOTP } from 'otpauth';
 import EncryptedStorage from './secureStorage';
+import * as LocalAuthentication from 'expo-local-authentication';
 
 // ──────────────────────────────────────────────
 // Tipi
 // ──────────────────────────────────────────────
-export interface TalksyUser {
+export interface SayUpUser {
   uid:       string;
   nickname:  string;
   displayName: string;
@@ -21,6 +23,119 @@ export interface TalksyUser {
   createdAt: number;
   fcmToken?: string;
   totpSecret?: string; // Aggiunto per permettere l'accesso da più dispositivi
+  authMethod?: 'totp' | 'password' | 'biometric';
+}
+
+const TOTP_PERIOD = 30;
+const TOTP_DIGITS = 6;
+const TOTP_SECRET_BYTES = 20;
+const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+
+function wordArrayToBytes(wordArray: any) {
+  const bytes: number[] = [];
+  const { words, sigBytes } = wordArray;
+  for (let i = 0; i < sigBytes; i += 1) {
+    bytes.push((words[i >>> 2] >>> (24 - (i % 4) * 8)) & 0xff);
+  }
+  return bytes;
+}
+
+function bytesToWordArray(bytes: number[]) {
+  const words: number[] = [];
+  for (let i = 0; i < bytes.length; i += 1) {
+    const wordIndex = i >>> 2;
+    const byteOffset = 24 - (i % 4) * 8;
+    words[wordIndex] = (words[wordIndex] || 0) | (bytes[i] << byteOffset);
+  }
+  return CryptoJS.lib.WordArray.create(words, bytes.length);
+}
+
+function base32Encode(bytes: number[]) {
+  let value = 0;
+  let bits = 0;
+  let output = '';
+  for (const byte of bytes) {
+    value = (value << 8) | byte;
+    bits += 8;
+    while (bits >= 5) {
+      output += BASE32_ALPHABET[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) {
+    output += BASE32_ALPHABET[(value << (5 - bits)) & 31];
+  }
+  return output;
+}
+
+function base32Decode(secret: string) {
+  const clean = secret.replace(/=+$/g, '').toUpperCase().replace(/[^A-Z2-7]/g, '');
+  let value = 0;
+  let bits = 0;
+  const bytes: number[] = [];
+  for (const char of clean) {
+    const index = BASE32_ALPHABET.indexOf(char);
+    if (index < 0) continue;
+    value = (value << 5) | index;
+    bits += 5;
+    if (bits >= 8) {
+      bytes.push((value >>> (bits - 8)) & 0xff);
+      bits -= 8;
+    }
+  }
+  return bytes;
+}
+
+function generateRandomBase32Secret() {
+  let output = '';
+  for (let i = 0; i < 32; i += 1) {
+    output += BASE32_ALPHABET[Math.floor(Math.random() * BASE32_ALPHABET.length)];
+  }
+  return output;
+}
+
+function counterToWordArray(counter: number) {
+  const high = Math.floor(counter / 0x100000000);
+  const low = counter >>> 0;
+  const hex = high.toString(16).padStart(8, '0') + low.toString(16).padStart(8, '0');
+  return CryptoJS.enc.Hex.parse(hex);
+}
+
+function generateOtp(secret: string, counter: number) {
+  const key = bytesToWordArray(base32Decode(secret));
+  const message = counterToWordArray(counter);
+  const hmac = CryptoJS.HmacSHA1(message, key);
+  const hash = wordArrayToBytes(hmac);
+  const offset = hash[hash.length - 1] & 0x0f;
+  const binary =
+    ((hash[offset] & 0x7f) << 24) |
+    ((hash[offset + 1] & 0xff) << 16) |
+    ((hash[offset + 2] & 0xff) << 8) |
+    (hash[offset + 3] & 0xff);
+  return (binary % 10 ** TOTP_DIGITS).toString().padStart(TOTP_DIGITS, '0');
+}
+
+function validateOtp(secret: string, code: string, window = 1) {
+  const normalized = code.trim().replace(/\D/g, '');
+  const totp = new TOTP({
+    secret: Secret.fromBase32(secret),
+    algorithm: 'SHA1',
+    digits: TOTP_DIGITS,
+    period: TOTP_PERIOD,
+  });
+  return totp.validate({ token: normalized, window }) !== null;
+}
+
+function buildOtpAuthUri(nickname: string, secret: string) {
+  const totp = new TOTP({
+    issuer: 'SayUp',
+    label: nickname,
+    secret: Secret.fromBase32(secret),
+    algorithm: 'SHA1',
+    digits: TOTP_DIGITS,
+    period: TOTP_PERIOD,
+  });
+  return totp.toString();
 }
 
 export async function isNicknameAvailable(nickname: string): Promise<boolean> {
@@ -48,16 +163,15 @@ export async function generateTOTPSecret(nickname: string): Promise<{
     throw new Error('Questo nickname e gia in uso');
   }
 
-  const totp = new TOTP({
-    issuer:    'Talksy',
-    label:     nickname,
-    algorithm: 'SHA1',
-    digits:    6,
-    period:    30,
-  });
+  const secret = generateRandomBase32Secret();
+  const qrUri = buildOtpAuthUri(nickname, secret);
 
-  const secret = totp.secret.base32;
-  const qrUri  = totp.toString(); // otpauth:// URI da passare a QRCode
+  console.log('[TOTP] generate secret', {
+    nickname: nickname.trim().toLowerCase(),
+    secretLength: secret.length,
+    secretPreview: secret.slice(0, 8),
+    qrUri,
+  });
 
   // Salva il segreto temporaneamente durante la registrazione
   await EncryptedStorage.setItem('totp_secret_pending', secret);
@@ -71,11 +185,22 @@ export async function generateTOTPSecret(nickname: string): Promise<{
 export async function verifyTOTPCode(code: string): Promise<boolean> {
   const secret = await EncryptedStorage.getItem('totp_secret_pending');
   if (!secret) throw new Error('Nessun segreto TOTP in attesa');
-
-  const totp  = new TOTP({ secret, algorithm: 'SHA1', digits: 6, period: 30 });
-  const delta = totp.validate({ token: code, window: 2 }); // FIX: finestra ±60s per tolleranza orario
-
-  return delta !== null;
+  const normalized = code.trim().replace(/\D/g, '');
+  const previewTotp = new TOTP({
+    secret: Secret.fromBase32(secret),
+    algorithm: 'SHA1',
+    digits: TOTP_DIGITS,
+    period: TOTP_PERIOD,
+  });
+  const expectedNow = previewTotp.generate();
+  const result = validateOtp(secret, normalized, 1);
+  console.log('[TOTP] verify pending', {
+    code: normalized,
+    expectedNow,
+    secretLength: secret.length,
+    result,
+  });
+  return result;
 }
 
 // ──────────────────────────────────────────────
@@ -86,8 +211,8 @@ export async function verifyTOTPCode(code: string): Promise<boolean> {
 // ──────────────────────────────────────────────
 export async function registerWithTOTP(
   nickname:    string,
-  profileData: Partial<TalksyUser>,
-): Promise<TalksyUser> {
+  profileData: Partial<SayUpUser>,
+): Promise<SayUpUser> {
   const cleanNickname = nickname.trim().toLowerCase();
   const available = await isNicknameAvailable(cleanNickname);
   if (!available) {
@@ -98,10 +223,10 @@ export async function registerWithTOTP(
   if (!secret) throw new Error('Dati di sicurezza mancanti. Ricomincia la registrazione.');
 
   // Deriva la password dal segreto (stessa logica del login)
-  const internalPassword = secret + 'Talksy1!'; 
+  const internalPassword = secret + 'SayUpApp1!'; 
 
   // Email interna derivata dal nickname (non esposta all'utente)
-  const internalEmail = `${cleanNickname}@talksy.internal`;
+  const internalEmail = `${cleanNickname}@sayup.internal`;
 
   const { user } = await Auth.createUserWithEmailAndPassword(internalEmail, internalPassword);
 
@@ -111,7 +236,7 @@ export async function registerWithTOTP(
     await EncryptedStorage.removeItem('totp_secret_pending');
   }
 
-  const newUser: TalksyUser = {
+  const newUser: SayUpUser = {
     uid:         user.uid,
     nickname:    cleanNickname,
     displayName: (profileData.displayName || nickname.trim()).slice(0, 50),
@@ -127,6 +252,12 @@ export async function registerWithTOTP(
 
   await Firestore.collection(Collections.USERS).doc(user.uid).set(newUser);
 
+  console.log('[TOTP] register completed', {
+    uid: user.uid,
+    nickname: cleanNickname,
+    hasSecret: !!secret,
+  });
+
   return newUser;
 }
 
@@ -136,8 +267,8 @@ export async function registerWithTOTP(
 export async function loginWithTOTP(
   nickname: string,
   code:     string,
-): Promise<TalksyUser> {
-  const internalEmail = `${nickname.toLowerCase()}@talksy.internal`;
+): Promise<SayUpUser> {
+  const internalEmail = `${nickname.toLowerCase()}@sayup.internal`;
   
   // Tenta di recuperare il profilo per ottenere l'UID (necessario per trovare il segreto)
   const userQuery = await Firestore.collection(Collections.USERS)
@@ -146,28 +277,36 @@ export async function loginWithTOTP(
     .get();
 
   if (userQuery.empty) throw new Error('Non esiste un account con questo nickname');
-  const userData = userQuery.docs[0].data() as TalksyUser;
+  const userData = userQuery.docs[0].data() as SayUpUser;
 
   // Recupera il segreto: prima prova in locale, se manca lo prende dal profilo (Firestore)
-  let secret = await EncryptedStorage.getItem(`totp_secret_${userData.uid}`);
-  if (!secret) secret = userData.totpSecret;
+  let secret: string | null = await EncryptedStorage.getItem(`totp_secret_${userData.uid}`);
+  if (!secret) secret = userData.totpSecret ?? null;
 
   if (!secret) throw new Error('Segreto TOTP non trovato');
 
-  const totp  = new TOTP({ secret, algorithm: 'SHA1', digits: 6, period: 30 });
-  const valid = totp.validate({ token: code, window: 2 }); // FIX: finestra ±60s
+  const normalized = code.trim().replace(/\D/g, '');
+  const previewTotp = new TOTP({
+    secret: Secret.fromBase32(secret),
+    algorithm: 'SHA1',
+    digits: TOTP_DIGITS,
+    period: TOTP_PERIOD,
+  });
+  const expectedNow = previewTotp.generate();
+  const result = validateOtp(secret, normalized, 1);
+  console.log('[TOTP] login verify', {
+    nickname: nickname.trim().toLowerCase(),
+    code: normalized,
+    expectedNow,
+    secretLength: secret.length,
+    result,
+  });
 
-  if (valid === null) {
+  if (!result) {
     throw new Error('Codice OTP non valido');
   }
-
-  // Usiamo il segreto stesso come password interna per Firebase
-  // ATTENZIONE: Per una sicurezza robusta in produzione, l'approccio ideale per il login "passwordless" con TOTP
-  // sarebbe usare Firebase Custom Authentication. Il tuo backend verificherebbe il codice TOTP e poi
-  // conierebbe un token Firebase personalizzato per l'app. Questo evita di derivare una password
-  // da un segreto memorizzato localmente, che, seppur cifrato, è un punto di vulnerabilità maggiore
-  // rispetto a un token di sessione di breve durata.
-  const internalPassword = secret + 'Talksy1!'; 
+  
+  const internalPassword = secret + 'SayUpApp1!'; 
   
   const { user } = await Auth.signInWithEmailAndPassword(internalEmail, internalPassword);
 
@@ -177,12 +316,12 @@ export async function loginWithTOTP(
 // ──────────────────────────────────────────────
 // Ottieni il profilo utente corrente
 // ──────────────────────────────────────────────
-export async function getCurrentUserProfile(): Promise<TalksyUser | null> {
+export async function getCurrentUserProfile(): Promise<SayUpUser | null> {
   const user = Auth.currentUser;
   if (!user) return null;
 
   const doc = await Firestore.collection(Collections.USERS).doc(user.uid).get();
-  return doc.exists ? (doc.data() as TalksyUser) : null;
+  return doc.exists ? (doc.data() as SayUpUser) : null;
 }
 
 // ──────────────────────────────────────────────
@@ -190,12 +329,12 @@ export async function getCurrentUserProfile(): Promise<TalksyUser | null> {
 // ──────────────────────────────────────────────
 export async function updateUserProfile(
   uid:     string,
-  updates: Partial<TalksyUser>,
+  updates: Partial<SayUpUser>,
 ): Promise<void> {
   await Firestore.collection(Collections.USERS).doc(uid).update(updates);
 }
 
-export async function searchUsers(query: string): Promise<TalksyUser[]> {
+export async function searchUsers(query: string): Promise<SayUpUser[]> {
   const q = query.trim().toLowerCase();
   if (!q) return [];
 
@@ -206,7 +345,144 @@ export async function searchUsers(query: string): Promise<TalksyUser[]> {
     .limit(20)
     .get();
 
-  return snap.docs.map(doc => doc.data() as TalksyUser);
+  return snap.docs.map((doc: any) => ({ uid: doc.id, ...doc.data() }) as SayUpUser);
+}
+
+export async function registerWithPassword(
+  nickname: string,
+  passwordCustom: string,
+  profileData: Partial<SayUpUser>,
+): Promise<SayUpUser> {
+  const cleanNickname = nickname.trim().toLowerCase();
+  const available = await isNicknameAvailable(cleanNickname);
+  if (!available) {
+    throw new Error('Questo nickname è già in uso');
+  }
+
+  const internalEmail = `${cleanNickname}@sayup.internal`;
+  const { user } = await Auth.createUserWithEmailAndPassword(internalEmail, passwordCustom);
+
+  const newUser: SayUpUser = {
+    uid:         user.uid,
+    nickname:    cleanNickname,
+    displayName: (profileData.displayName || nickname.trim()).slice(0, 50),
+    bio:         profileData.bio         ?? '',
+    photoURL:    null,
+    friends:     [],
+    incomingFriendRequests: [],
+    outgoingFriendRequests: [],
+    isAdmin:     false,
+    createdAt:   Date.now(),
+    authMethod:  'password',
+  };
+
+  await Firestore.collection(Collections.USERS).doc(user.uid).set(newUser);
+  return newUser;
+}
+
+export async function registerWithBiometrics(
+  nickname: string,
+  profileData: Partial<SayUpUser>,
+): Promise<SayUpUser> {
+  const cleanNickname = nickname.trim().toLowerCase();
+
+  const hasHardware = await LocalAuthentication.hasHardwareAsync();
+  const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+  if (!hasHardware || !isEnrolled) {
+    throw new Error('Autenticazione biometrica non supportata o non configurata su questo dispositivo.');
+  }
+
+  const authResult = await LocalAuthentication.authenticateAsync({
+    promptMessage: 'Registra la tua Passkey biometrica per SayUp',
+    cancelLabel: 'Annulla',
+  });
+
+  if (!authResult.success) {
+    throw new Error('Registrazione biometrica annullata o fallita.');
+  }
+
+  const available = await isNicknameAvailable(cleanNickname);
+  if (!available) {
+    throw new Error('Questo nickname è già in uso');
+  }
+
+  const internalEmail = `${cleanNickname}@sayup.internal`;
+  const randomPassword = CryptoJS.lib.WordArray.random(32).toString() + 'SayUpBiometrics1!';
+  const { user } = await Auth.createUserWithEmailAndPassword(internalEmail, randomPassword);
+
+  // Salva la password locale
+  await EncryptedStorage.setItem(`biometric_nickname_key_${cleanNickname}`, randomPassword);
+
+  const newUser: SayUpUser = {
+    uid:         user.uid,
+    nickname:    cleanNickname,
+    displayName: (profileData.displayName || nickname.trim()).slice(0, 50),
+    bio:         profileData.bio         ?? '',
+    photoURL:    null,
+    friends:     [],
+    incomingFriendRequests: [],
+    outgoingFriendRequests: [],
+    isAdmin:     false,
+    createdAt:   Date.now(),
+    authMethod:  'biometric',
+  };
+
+  await Firestore.collection(Collections.USERS).doc(user.uid).set(newUser);
+  return newUser;
+}
+
+export async function loginWithPassword(nickname: string, passwordCustom: string): Promise<SayUpUser> {
+  const cleanNickname = nickname.trim().toLowerCase();
+  const internalEmail = `${cleanNickname}@sayup.internal`;
+
+  const userQuery = await Firestore.collection(Collections.USERS)
+    .where('nickname', '==', cleanNickname)
+    .limit(1)
+    .get();
+
+  if (userQuery.empty) throw new Error('Non esiste un account con questo nickname');
+  const userData = userQuery.docs[0].data() as SayUpUser;
+
+  await Auth.signInWithEmailAndPassword(internalEmail, passwordCustom);
+  return userData;
+}
+
+export async function loginWithBiometrics(nickname: string): Promise<SayUpUser> {
+  const cleanNickname = nickname.trim().toLowerCase();
+  
+  const hasHardware = await LocalAuthentication.hasHardwareAsync();
+  const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+  if (!hasHardware || !isEnrolled) {
+    throw new Error('Autenticazione biometrica non disponibile o non configurata.');
+  }
+
+  const authResult = await LocalAuthentication.authenticateAsync({
+    promptMessage: 'Accedi a SayUp con la tua Passkey biometrica',
+    cancelLabel: 'Annulla',
+  });
+
+  if (!authResult.success) {
+    throw new Error('Autenticazione biometrica fallita');
+  }
+
+  const storedPassword = await EncryptedStorage.getItem(`biometric_nickname_key_${cleanNickname}`);
+  if (!storedPassword) {
+    throw new Error('Nessuna credenziale biometrica salvata per questo nickname su questo dispositivo.');
+  }
+
+  const internalEmail = `${cleanNickname}@sayup.internal`;
+  const userQuery = await Firestore.collection(Collections.USERS)
+    .where('nickname', '==', cleanNickname)
+    .limit(1)
+    .get();
+
+  if (userQuery.empty) throw new Error('Non esiste un account con questo nickname');
+  const userData = userQuery.docs[0].data() as SayUpUser;
+
+  await Auth.signInWithEmailAndPassword(internalEmail, storedPassword);
+  return userData;
 }
 
 export async function logout(): Promise<void> {

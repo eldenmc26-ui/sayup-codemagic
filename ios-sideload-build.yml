@@ -12,7 +12,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18 # O 20, se preferisci una versione più recente
+          node-version: 18 # Expo SDK 50 richiede Node 18
           cache: 'npm'
 
       - name: Install dependencies
@@ -35,7 +35,7 @@ jobs:
       - name: Build Xcode (Unsigned)
         run: |
           xcodebuild -workspace ios/*.xcworkspace \
-            -scheme talksy \
+            -scheme sayup \
             -configuration Release \
             -sdk iphoneos \
             -derivedDataPath build \
@@ -46,10 +46,10 @@ jobs:
         run: |
           mkdir Payload
           cp -r build/Build/Products/Release-iphoneos/*.app Payload/
-          zip -r Talksy-Sideload.ipa Payload
+          zip -r SayUp-Sideload.ipa Payload
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Talksy-iOS-IPA
-          path: Talksy-Sideload.ipa
+          name: SayUp-iOS-IPA
+          path: SayUp-Sideload.ipa
