@@ -35,6 +35,11 @@ workflows:
         script: |
           npx expo prebuild --platform ios --clean
 
+      # 🩹 Patch Podfile
+      - name: Patch Podfile for BoringSSL and deployment targets
+        script: |
+          node scripts/patch-podfile.js
+
       # 🍫 Pods
       - name: Install CocoaPods
         script: |
