@@ -1,6 +1,6 @@
-# Talksy - Social Messaging App
+# SayUp - Social Messaging App
 
-**Talksy** è un'app di messaggistica e social networking costruita con **React Native** + **Firebase**, con autenticazione TOTP (2FA), chat private e di gruppo, news con like/commenti, chiamate WebRTC, e notifiche push su **Android e iOS**.
+**SayUp** è un'app di messaggistica e social networking costruita con **React Native** + **Firebase**, con autenticazione TOTP (2FA), chat private e di gruppo, news con like/commenti, chiamate WebRTC, e notifiche push su **Android e iOS**.
 
 ---
 
@@ -8,7 +8,7 @@
 
 | Livello         | Tecnologia                                      |
 |-----------------|-------------------------------------------------|
-| Frontend        | React Native 0.73.6 + Expo 55                   |
+| Frontend        | React Native 0.76.3 + Expo 50                   |
 | Stato           | Zustand (external store)                        |
 | Auth            | Firebase Auth (email/password) + TOTP (OTPAuth) |
 | Database        | Firebase Firestore (metadata)                   |
@@ -124,7 +124,10 @@ talksy/
 ### 1. Installazione dipendenze
 
 ```bash
-npm install
+npm install --legacy-peer-deps
+# Installa moduli nativi per WebRTC
+npx expo install react-native-webrtc react-native-incall-manager
+npx expo prebuild
 ```
 
 ### 2. Configurazione Firebase
@@ -307,11 +310,11 @@ Tech, Sport, Finanza, Musica, Politica, Scienza, Cinema, Gaming, Viaggi, Cucina
 ```json
 {
   "id": "news_001",
-  "title": "Nuovo aggiornamento Talksy!",
+  "title": "Nuovo aggiornamento SayUp!",
   "description": "Abbiamo aggiunto le notifiche push e i gruppi di chat.",
-  "source": "Talksy Blog",
+  "source": "SayUp Blog",
   "category": "Tech",
-  "url": "https://talksy.app/blog/update-v1-2",
+  "url": "https://sayup.app/blog/update-v1-2",
   "imageUrl": "https://firebasestorage.googleapis.com/.../update.png",
   "createdAt": 1704067200000,
   "createdBy": "uid_admin_123",
@@ -453,3 +456,5 @@ cd ios && pod deintegrate && pod install
 ## Licenza
 
 MIT — Progetto open source per scopo didattico.
+#   s a y u p - c o d e m a g i c  
+ 
