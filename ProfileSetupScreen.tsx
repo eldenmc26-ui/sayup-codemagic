@@ -98,7 +98,7 @@ export default function ProfileSetupScreen() {
       >
         {loading
           ? <ActivityIndicator color="#fff" />
-          : <Text style={s.btnText}>Vai a Talksy →</Text>
+          : <Text style={s.btnText}>Vai a SayUp →</Text>
         }
       </TouchableOpacity>
     </ScrollView>

@@ -53,6 +53,7 @@
             "buildToolsVersion": "34.0.0"
           },
           "ios": {
+            "useFrameworks": "static",
             "newArchEnabled": false
           }
         }

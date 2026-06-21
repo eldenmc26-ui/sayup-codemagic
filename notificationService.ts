@@ -92,12 +92,12 @@ export function listenForegroundMessages(
 
     // Logica specifica per tipo
     if (type === 'call' && Platform.OS !== 'web') {
-      RNCallKeep.displayIncomingCall(chatId, callerName || 'Talksy', callerName || 'Chiamata');
+      RNCallKeep.displayIncomingCall(chatId, callerName || 'SayUp', callerName || 'Chiamata');
       return; // Non mostriamo l'alert se è una chiamata, ci pensa CallKeep
     }
 
     onMessage({
-      title: remoteMessage.notification?.title ?? 'Talksy',
+      title: remoteMessage.notification?.title ?? 'SayUp',
       body: remoteMessage.notification?.body ?? '',
       data: remoteMessage.data,
     });

@@ -158,7 +158,7 @@ export default function RegisterScreen({ navigation }: Props) {
           <View style={s.section}>
             <Text style={s.sectionTitle}>Scegli il tuo nickname</Text>
             <Text style={s.sectionSubtitle}>
-              È il tuo identificativo su Talksy. Non potrai cambiarlo.
+              È il tuo identificativo su SayUp. Non potrai cambiarlo.
             </Text>
             <TextInput
               style={s.input}
@@ -194,7 +194,7 @@ export default function RegisterScreen({ navigation }: Props) {
             </Text>
             <TouchableOpacity
               style={s.qrContainer}
-              onPress={() => Linking.openURL(qrUri).catch(() => Alert.alert('Errore', 'Nessuna app di autenticazione trovata.'))}
+              onPress={() => Linking.openURL(qrUri).catch(() => Alert.alert('Errore', 'Nessuna app di autenticazione trouvata.'))}
               activeOpacity={0.8}
             >
               <QRCode value={qrUri} size={180} backgroundColor="#fff" />
@@ -203,7 +203,7 @@ export default function RegisterScreen({ navigation }: Props) {
 
             <View style={s.infoBox}>
               <Text style={s.infoText}>
-                Il QR aggiunge Talksy al tuo Authenticator.{'\n'}
+                Il QR aggiunge SayUp al tuo Authenticator.{'\n'}
                 Dovrai inserire il codice ogni volta che accedi.
               </Text>
             </View>
@@ -230,7 +230,7 @@ export default function RegisterScreen({ navigation }: Props) {
           <View style={s.section}>
             <Text style={s.sectionTitle}>Inserisci il codice OTP</Text>
             <Text style={s.sectionSubtitle}>
-              Apri il tuo Authenticator e inserisci il codice a 6 cifre per Talksy.
+              Apri il tuo Authenticator e inserisci il codice a 6 cifre per SayUp.
             </Text>
             <View style={s.otpRow}>{otp.map((digit, i) => (
               <TextInput

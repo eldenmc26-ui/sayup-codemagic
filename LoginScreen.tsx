@@ -190,7 +190,7 @@ export default function LoginScreen({ navigation }: Props) {
               <>
                 <Text style={s.sectionTitle}>Codice OTP</Text>
                 <Text style={s.sectionSubtitle}>
-                  Apri il tuo Authenticator e inserisci il codice a 6 cifre per Talksy.
+                  Apri il tuo Authenticator e inserisci il codice a 6 cifre per SayUp.
                 </Text>
 
                 <View style={s.otpRow}>
