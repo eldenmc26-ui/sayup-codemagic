@@ -6,7 +6,7 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "ios-mac": "EXPO_NO_GIT_STATUS=1 npx expo prebuild --platform ios --clean --no-install && node scripts/patch-podfile.js && npx expo run:ios",
+    "ios-mac": "node scripts/ios-mac.js",
     "lint": "eslint . --ext .ts,.tsx"
   },
   "dependencies": {
