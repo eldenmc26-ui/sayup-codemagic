@@ -28,6 +28,18 @@ const patch = `
           end
         end
       end
+      if target.name == 'gRPC-Core'
+        file_path = File.join(installer.sandbox.pod_dir('gRPC-Core'), 'src/core/lib/promise/detail/basic_seq.h')
+        if File.exist?(file_path)
+          text = File.read(file_path)
+          old_line = "Traits::template CallSeqFactory(f_, *cur_, std::move(arg))"
+          new_line = "Traits::template CallSeqFactory<>(f_, *cur_, std::move(arg))"
+          if text.include?(old_line)
+            puts "Patching gRPC-Core basic_seq.h..."
+            File.open(file_path, "w") { |file| file.puts text.gsub(old_line, new_line) }
+          end
+        end
+      end
     end
 `;
 
