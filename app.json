@@ -54,7 +54,8 @@
           },
           "ios": {
             "useFrameworks": "static",
-            "newArchEnabled": false
+            "newArchEnabled": false,
+            "deploymentTarget": "15.0"
           }
         }
       ]
