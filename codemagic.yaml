@@ -55,7 +55,7 @@ workflows:
             -sdk iphoneos \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGNING_REQUIRED=NO > build.log 2>&1 || (echo "=== BUILD ERROR LOGS ===" && grep -i -C 10 "error:" build.log || tail -n 200 build.log; exit 1)
 
       # 📦 IPA
       - name: Create IPA
