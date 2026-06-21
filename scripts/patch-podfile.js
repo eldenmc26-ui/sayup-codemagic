@@ -10,6 +10,11 @@ if (!fs.existsSync(podfilePath)) {
 
 let content = fs.readFileSync(podfilePath, 'utf8');
 
+// Force Firebase iOS SDK to 10.33.0 (contains official Xcode 16/Clang 19 compatibility fixes)
+if (!content.includes('$FirebaseSDKVersion')) {
+  content = `$FirebaseSDKVersion = '10.33.0'\n` + content;
+}
+
 const targetStr = 'post_install do |installer|';
 const patch = `
     # Antigravity Patch: Fix deployment targets, DEFINES_MODULE, C++17 standard and BoringSSL-GRPC warn compiler flag
