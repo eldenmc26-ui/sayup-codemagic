@@ -70,3 +70,51 @@ workflows:
 
     artifacts:
       - SayUp.ipa
+
+  macos-remote-debug:
+    name: macOS Remote Debug Session (VNC/SSH)
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+
+    environment:
+      node: 18
+      xcode: latest
+      cocoapods: default
+
+    scripts:
+      - name: Install dependencies
+        script: |
+          npm install --legacy-peer-deps
+
+      - name: Fix permissions
+        script: |
+          chmod -R +x node_modules/.bin || true
+
+      - name: Expo prebuild
+        script: |
+          npx expo prebuild --platform ios --clean --no-install
+
+      - name: Patch Podfile for Xcode 16 & C++17
+        script: |
+          node scripts/patch-podfile.js
+
+      - name: Patch for Free Developer Account (Disable Push Notifications)
+        script: |
+          node scripts/patch-free-signing.js
+
+      - name: Install CocoaPods
+        script: |
+          cd ios
+          pod install --repo-update
+          cd ..
+
+      - name: Hold build for VNC/SSH connection
+        script: |
+          echo "=========================================================="
+          echo "BUILD IS HELD FOR INTERACTIVE DEBBUGING."
+          echo "Ensure 'Enable SSH/VNC access' was checked in the Build UI."
+          echo "Open VNC viewer and connect using the details in the tab above."
+          echo "You can open Xcode by double-clicking 'ios/SayUp.xcworkspace'."
+          echo "=========================================================="
+          while true; do sleep 60; done
+
