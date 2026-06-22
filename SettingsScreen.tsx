@@ -28,13 +28,9 @@ export default function SettingsScreen() {
     if (!photoUri) return user?.photoURL ?? null;
 
     const ref = Storage.ref(`avatars/${uid}/profile.jpg`);
-    if (Platform.OS === 'web') {
-      const response = await fetch(photoUri);
-      const blob = await response.blob();
-      await ref.put(blob);
-    } else {
-      await ref.putFile(photoUri, { contentType: 'image/jpeg' });
-    }
+    const response = await fetch(photoUri);
+    const blob = await response.blob();
+    await ref.put(blob, { contentType: 'image/jpeg' });
     return await ref.getDownloadURL();
   }
 

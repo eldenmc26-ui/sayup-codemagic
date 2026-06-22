@@ -312,13 +312,18 @@ export default function RootNavigator() {
                 const data = change.doc.data() as CallSession;
                 const isCaller = data.callerId === firebaseUser.uid;
                 if (change.type === 'added') {
+                  const isStale = Date.now() - data.createdAt > 2 * 60 * 1000;
+                  if (isStale) return; // Ignora chiamate vecchie/fantasma su avvio app
+
                   if (!isCaller) {
                     if (activeCallRef.current) {
                       console.log('[RootNavigator] Chiamata in arrivo ignorata: già in chiamata');
                       return;
                     }
                     setActiveCall({ id: change.doc.id, data });
-                    playRingtone();
+                    if (data.status === 'dialing') {
+                      playRingtone();
+                    }
                   }
                 } else if (change.type === 'removed') {
                   if (!isCaller) {
@@ -424,6 +429,7 @@ export default function RootNavigator() {
     const InCallManager = getInCallManager();
     if (Platform.OS !== 'web' && InCallManager) {
       try {
+        InCallManager.setSpeakerphoneOn(useSpeaker);
         InCallManager.setForceSpeakerphoneOn(useSpeaker);
       } catch (e) { }
     }
@@ -637,38 +643,39 @@ export default function RootNavigator() {
 
   const renderOverlay = () => {
     if (!activeCall) return null;
-    const isIncoming = activeCall.data.status === 'dialing' && activeCall.data.callerId !== user?.uid;
+    const isIncomingCall = activeCall.data.callerId !== user?.uid;
+    const showAcceptButton = activeCall.data.status === 'dialing' && isIncomingCall;
     const isGroup = activeCall.data.participants && activeCall.data.participants.length > 2;
     const displayName = isGroup 
       ? (activeCall.data.groupName || 'Chiamata di gruppo')
-      : (isIncoming ? (activeCall.data.callerName || 'Chiamata Vocale') : (activeCall.data.groupName || 'Chiamata Vocale'));
+      : (isIncomingCall ? (activeCall.data.callerName || 'Chiamata Vocale') : (activeCall.data.groupName || 'Chiamata Vocale'));
 
     return (
       <Modal visible={true} animationType="slide">
         <View style={[styles.callOverlay, activeCall.data.status === 'active' ? styles.callActive : styles.callDialing]}>
           <Ionicons name="person-circle" size={100} color="#fff" />
           <Text style={styles.callTitle}>{displayName}</Text>
-          <Text style={styles.callStatus}>{activeCall.data.status === 'active' ? formatTime(duration) : isIncoming ? 'CHIAMATA IN ARRIVO' : 'CHIAMATA IN CORSO...'}</Text>
+          <Text style={styles.callStatus}>{activeCall.data.status === 'active' ? formatTime(duration) : isIncomingCall ? 'CHIAMATA IN ARRIVO' : 'CHIAMATA IN CORSO...'}</Text>
 
           {activeCall.data.status === 'active' && (
-            <View style={[styles.controlsRow, { flexDirection: 'row', gap: 20 }]}>
+            <View style={[styles.controlsRow, { flexDirection: 'row', gap: 24 }]}>
               <TouchableOpacity
                 style={[styles.controlBtn, isMuted && styles.controlBtnActive]}
                 onPress={toggleMute}
               >
-                <Ionicons name={isMuted ? "mic-off" : "mic"} size={28} color="#fff" />
+                <Ionicons name="mic-off" size={28} color={isMuted ? "#000" : "#fff"} />
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.controlBtn, isSpeaker && styles.controlBtnActive]}
                 onPress={toggleSpeaker}
               >
-                <Ionicons name={isSpeaker ? "volume-high" : "volume-low"} size={28} color="#fff" />
+                <Ionicons name="volume-high" size={28} color={isSpeaker ? "#000" : "#fff"} />
               </TouchableOpacity>
             </View>
           )}
 
           <View style={styles.callActions}>
-            {isIncoming && (
+            {showAcceptButton && (
               <TouchableOpacity style={[styles.btn, styles.accept]} onPress={handleAccept}>
                 <Ionicons name="call" size={32} color="#fff" />
               </TouchableOpacity>
@@ -717,8 +724,17 @@ const styles = StyleSheet.create({
   callTitle: { color: '#fff', fontSize: 28, fontWeight: 'bold', marginTop: 20 },
   callStatus: { color: 'rgba(255,255,255,0.8)', fontSize: 16, marginTop: 8, letterSpacing: 1.5, fontWeight: '600' },
   controlsRow: { marginTop: 40, marginBottom: 20 },
-  controlBtn: { alignItems: 'center', padding: 15, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.15)' },
-  controlBtnActive: { backgroundColor: 'rgba(255,255,255,0.4)' },
+  controlBtn: { 
+    width: 64, 
+    height: 64, 
+    borderRadius: 32, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    backgroundColor: 'rgba(255,255,255,0.15)' 
+  },
+  controlBtnActive: { 
+    backgroundColor: 'rgba(255,255,255,0.9)' 
+  },
   controlLabel: { color: '#fff', fontSize: 12, marginTop: 5 },
   callActions: { flexDirection: 'row', gap: 40, marginTop: 40 },
   btn: { width: 75, height: 75, borderRadius: 40, alignItems: 'center', justifyContent: 'center', elevation: 5, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 5, shadowOffset: { width: 0, height: 3 } },

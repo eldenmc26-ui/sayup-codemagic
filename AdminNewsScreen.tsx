@@ -57,13 +57,9 @@ export default function AdminNewsScreen({ navigation }: any) {
     if (!imageUri) return existingImageUrl;
 
     const ref = Storage.ref(`news/${Auth.currentUser!.uid}/${Date.now()}.jpg`);
-    if (Platform.OS === 'web') {
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-      await ref.put(blob);
-    } else {
-      await ref.putFile(imageUri, { contentType: 'image/jpeg' });
-    }
+    const response = await fetch(imageUri);
+    const blob = await response.blob();
+    await ref.put(blob, { contentType: 'image/jpeg' });
     return await ref.getDownloadURL();
   }
 
