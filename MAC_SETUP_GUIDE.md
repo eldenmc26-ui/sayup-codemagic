@@ -61,14 +61,59 @@ Abbiamo creato uno script che fa tutto da solo: genera la cartella iOS, inserisc
      * Vai su *Impostazioni* > *Privacy e sicurezza* > scendi in fondo su *Modalità sviluppatore* > attiva la spunta.
      * Riavvia l'iPhone quando richiesto e conferma l'attivazione.
   4. Lancia il comando per compilare direttamente sul tuo iPhone:
-     ```bash
-     npm run ios-mac -- --device
-     ```
+     * **Se usi un account sviluppatore Apple a pagamento ($99/anno):**
+       ```bash
+       npm run ios-mac -- --device
+       ```
+     * **Se usi un account Apple ID standard / gratuito (senza pagare l'abbonamento sviluppatori):**
+       Dovrai disabilitare le notifiche push nativamente per consentire a Xcode di accettare il profilo gratuito:
+       ```bash
+       npm run ios-mac -- --free --device
+       ```
   5. Il terminale ti chiederà di selezionare il tuo iPhone dall'elenco. Digitalo o selezionalo per iniziare.
 
 ---
 
 ## 3. Risoluzione dei Problemi Comuni (Troubleshooting)
+
+### 🔴 Errore: Notifiche Push o "aps-environment" non supportati (Account Gratuito)
+Gli account sviluppatore Apple gratuiti **non hanno i permessi per usare le Notifiche Push** a livello di sistema operativo. Se provi a compilare il progetto generato da Expo, Xcode fallirà dicendo che il profilo di provisioning non supporta la capability "Push Notifications" (o l'entitlement `aps-environment`).
+
+**Come risolvere in automatico:**
+* **Se usi la riga di comando:** Aggiungi sempre il parametro `--free` al comando di build:
+  ```bash
+  npm run ios-mac -- --free --device
+  ```
+* **Se preferisci usare Xcode direttamente:** Prima di aprire il progetto in Xcode o avviare la compilazione, esegui questo comando nel terminale del Mac per rimuovere i riferimenti alle notifiche push dai file nativi generati:
+  ```bash
+  npm run patch-free
+  ```
+  Una volta fatto, puoi procedere a compilare su Xcode. *(Nota: Se esegui un `prebuild --clean` o elimini la cartella `ios`, dovrai ri-eseguire `npm run patch-free` prima di ricompilare).*
+
+---
+
+### 🔴 Errore: Flag del compilatore o Pods che falliscono in Xcode
+Se apri Xcode direttamente e ricevi errori sui Pods (come flag `-GCC_WARN_INHIBIT_ALL_WARNINGS` non riconosciuto o errori C++ in `basic_seq.h`), significa che Xcode sta provando a compilare i file nativi grezzi prima che vengano applicate le patch necessarie per Xcode 16.
+
+**Come risolvere:**
+1. Assicurati che lo script di prebuild e patching sia stato eseguito almeno una volta.
+2. Se vuoi configurare tutto in un colpo solo prima di aprire Xcode, esegui:
+   ```bash
+   # Genera la cartella nativa pulita senza compilare
+   npx expo prebuild --platform ios --clean --no-install
+   
+   # Applica le patch Xcode 16/Pods
+   node scripts/patch-podfile.js
+   
+   # Se usi un account gratuito, applica anche la patch per le notifiche push
+   node scripts/patch-free-signing.js
+   
+   # Installa i CocoaPods con le patch attive
+   cd ios && pod install && cd ..
+   ```
+3. A questo punto puoi aprire `ios/SayUp.xcworkspace` in Xcode ed eseguire la build (Product > Build o Run) senza alcun errore di compilazione dei Pods.
+
+---
 
 ### 🔴 Errore: "Untrusted Developer" sul tuo iPhone
 Se l'app viene installata sul tuo telefono ma non si avvia dicendo che lo sviluppatore non è attendibile:
@@ -90,7 +135,7 @@ Questo accade quando Xcode non sa quale account Apple ID utilizzare per firmare 
 5. Nella barra laterale sinistra di Xcode, clicca sul file radice blu **SayUp**.
 6. Clicca sulla scheda **Signing & Capabilities**.
 7. Sotto la voce **Team**, seleziona il tuo account personale (*Personal Team* o il tuo nome).
-8. Chiudi Xcode e lancia nuovamente `npm run ios-mac -- --device` nel Terminale.
+8. Chiudi Xcode e lancia nuovamente `npm run ios-mac -- --free --device` nel Terminale.
 
 ---
 

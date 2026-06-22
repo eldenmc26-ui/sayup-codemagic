@@ -4,8 +4,10 @@ const path = require('path');
 // Prevent Expo from complaining about dirty git working tree
 process.env.EXPO_NO_GIT_STATUS = '1';
 
-// Get extra arguments passed to the npm script (e.g., --device)
-const extraArgs = process.argv.slice(2).join(' ');
+// Get extra arguments passed to the npm script (e.g., --device, --free)
+const extraArgsArray = process.argv.slice(2);
+const hasFreeFlag = extraArgsArray.includes('--free');
+const filteredArgs = extraArgsArray.filter(arg => arg !== '--free').join(' ');
 
 try {
   console.log("=== 1. Starting Expo Prebuild (Clean, No Install) ===");
@@ -15,8 +17,14 @@ try {
   // Require and run the patch-podfile script
   require('./patch-podfile.js');
 
-  console.log(`\n=== 3. Building and Running iOS App (args: ${extraArgs}) ===`);
-  execSync(`npx expo run:ios ${extraArgs}`, { stdio: 'inherit' });
+  if (hasFreeFlag) {
+    console.log("\n=== 2.5. Stripping Push Notifications for Free Apple Developer Account ===");
+    // Require and run the patch-free-signing script
+    require('./patch-free-signing.js')();
+  }
+
+  console.log(`\n=== 3. Building and Running iOS App (args: ${filteredArgs}) ===`);
+  execSync(`npx expo run:ios ${filteredArgs}`, { stdio: 'inherit' });
 
   console.log("\n=== Build Process Completed Successfully ===");
 } catch (error) {

@@ -7,6 +7,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "ios-mac": "node scripts/ios-mac.js",
+    "patch-free": "node scripts/patch-free-signing.js",
     "lint": "eslint . --ext .ts,.tsx"
   },
   "dependencies": {
