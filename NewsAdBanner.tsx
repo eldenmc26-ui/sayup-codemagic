@@ -2,10 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 
-const bannerUnitId =
-  __DEV__
-    ? TestIds.BANNER
-    : 'ca-app-pub-4696380411829532/4879158283';
+const bannerUnitId = TestIds.BANNER;
 
 export default function NewsAdBanner() {
   return (
