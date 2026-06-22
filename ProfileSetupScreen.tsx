@@ -31,7 +31,7 @@ export default function ProfileSetupScreen() {
       const blob = await response.blob();
       await ref.put(blob);
     } else {
-      await ref.putFile(photoUri);
+      await ref.putFile(photoUri, { contentType: 'image/jpeg' });
     }
     return await ref.getDownloadURL();
   }

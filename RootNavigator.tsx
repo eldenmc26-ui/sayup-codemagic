@@ -304,7 +304,7 @@ export default function RootNavigator() {
         // Listener per chiamate in arrivo
         callsUnsub = Firestore.collection(Collections.CALL_HISTORY)
           .where('participants', 'array-contains', firebaseUser.uid)
-          .where('status', '==', 'dialing')
+          .where('status', 'in', ['dialing', 'active'])
           .onSnapshot(
             (snap: any) => {
               if (!snap || typeof snap.docChanges !== 'function') return;
@@ -313,6 +313,10 @@ export default function RootNavigator() {
                 const isCaller = data.callerId === firebaseUser.uid;
                 if (change.type === 'added') {
                   if (!isCaller) {
+                    if (activeCallRef.current) {
+                      console.log('[RootNavigator] Chiamata in arrivo ignorata: già in chiamata');
+                      return;
+                    }
                     setActiveCall({ id: change.doc.id, data });
                     playRingtone();
                   }
@@ -433,6 +437,28 @@ export default function RootNavigator() {
     }
     return () => clearInterval(timerRef.current);
   }, [activeCall?.data.status]);
+
+  useEffect(() => {
+    const InCallManager = getInCallManager();
+    if (Platform.OS !== 'web' && InCallManager) {
+      if (activeCall?.data.status === 'active') {
+        console.log('[InCallManager] Starting audio session');
+        try {
+          InCallManager.start({ media: 'audio', auto: true });
+          InCallManager.setForceSpeakerphoneOn(isSpeaker);
+        } catch (e) {
+          console.log('[InCallManager] Start error:', e);
+        }
+      } else if (!activeCall) {
+        console.log('[InCallManager] Stopping audio session');
+        try {
+          InCallManager.stop();
+        } catch (e) {
+          console.log('[InCallManager] Stop error:', e);
+        }
+      }
+    }
+  }, [activeCall?.data.status, activeCall === null]);
 
   const playRingtone = () => {
     if (Platform.OS === 'web' && !ringtoneRef.current) {
@@ -612,12 +638,16 @@ export default function RootNavigator() {
   const renderOverlay = () => {
     if (!activeCall) return null;
     const isIncoming = activeCall.data.status === 'dialing' && activeCall.data.callerId !== user?.uid;
+    const isGroup = activeCall.data.participants && activeCall.data.participants.length > 2;
+    const displayName = isGroup 
+      ? (activeCall.data.groupName || 'Chiamata di gruppo')
+      : (isIncoming ? (activeCall.data.callerName || 'Chiamata Vocale') : (activeCall.data.groupName || 'Chiamata Vocale'));
 
     return (
       <Modal visible={true} animationType="slide">
         <View style={[styles.callOverlay, activeCall.data.status === 'active' ? styles.callActive : styles.callDialing]}>
           <Ionicons name="person-circle" size={100} color="#fff" />
-          <Text style={styles.callTitle}>{activeCall.data.groupName || 'Chiamata Vocale'}</Text>
+          <Text style={styles.callTitle}>{displayName}</Text>
           <Text style={styles.callStatus}>{activeCall.data.status === 'active' ? formatTime(duration) : isIncoming ? 'CHIAMATA IN ARRIVO' : 'CHIAMATA IN CORSO...'}</Text>
 
           {activeCall.data.status === 'active' && (

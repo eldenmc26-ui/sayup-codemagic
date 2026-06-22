@@ -217,6 +217,7 @@ export async function ensureChatParticipants(chatId: string): Promise<void> {
 
 export interface CallSession {
   callerId: string;
+  callerName?: string;
   participants: string[]; // Supporto per più persone
   status: 'dialing' | 'active' | 'ended';
   type: 'voice' | 'video';
@@ -238,6 +239,7 @@ export async function startVoiceCall(chatId: string, participants: string[], gro
       chatId, 
       participants: [...new Set([...participants, myUid])], 
       callerId: myUid,
+      callerName: Auth.currentUser?.displayName || 'Qualcuno',
       groupName: groupName || 'Chiamata vocale',
       status: 'dialing', 
       createdAt: Date.now(),
@@ -248,6 +250,10 @@ export async function startVoiceCall(chatId: string, participants: string[], gro
     const pc: any = new RTCPeerConnection({
       iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
     });
+
+    pc.ontrack = (event: any) => {
+      console.log('[WebRTC] Caller riceve track remoto');
+    };
 
     // Ottieni stream audio locale e aggiungilo alla PeerConnection
     const stream = (await mediaDevices.getUserMedia({ audio: true, video: false })) as any;

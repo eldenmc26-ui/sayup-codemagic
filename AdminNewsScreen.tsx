@@ -62,7 +62,7 @@ export default function AdminNewsScreen({ navigation }: any) {
       const blob = await response.blob();
       await ref.put(blob);
     } else {
-      await ref.putFile(imageUri);
+      await ref.putFile(imageUri, { contentType: 'image/jpeg' });
     }
     return await ref.getDownloadURL();
   }

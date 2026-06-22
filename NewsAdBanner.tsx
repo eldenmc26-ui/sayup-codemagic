@@ -16,6 +16,9 @@ export default function NewsAdBanner() {
         requestOptions={{
           requestNonPersonalizedAdsOnly: true,
         }}
+        onAdFailedToLoad={(error) => {
+          console.warn('[AdMob] Banner ad failed to load:', error);
+        }}
       />
     </View>
   );

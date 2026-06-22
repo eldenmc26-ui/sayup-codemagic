@@ -22,7 +22,10 @@ export default function App() {
 
   useEffect(() => {
     mobileAds()
-      .initialize()
+      .setRequestConfiguration({
+        testDeviceIdentifiers: ['EMULATOR'],
+      })
+      .then(() => mobileAds().initialize())
       .then(() => console.log('[AdMob] Mobile Ads SDK initialized'))
       .catch((error) => console.warn('[AdMob] init failed', error));
 
